@@ -538,56 +538,163 @@ class LinearSystem2DApp(tk.Tk):
                 return "Caso no clasificado"
 
     def _update_results(self, A, eigenvals, eigenvecs, classification):
-        """Update the results display with analysis."""
+        """Update the results display with detailed step-by-step analysis."""
         self.txt_results.config(state='normal')
         self.txt_results.delete('1.0', tk.END)
         
-        self.txt_results.insert(tk.END, "== ANÁLISIS DEL SISTEMA LINEAL ==\n\n")
+        self.txt_results.insert(tk.END, "== ANÁLISIS PASO A PASO DEL SISTEMA LINEAL ==\n\n")
         
-        # System matrix
-        self.txt_results.insert(tk.END, "Matriz del sistema A:\n")
-        self.txt_results.insert(tk.END, f"┌ {A[0,0]:8.3f}  {A[0,1]:8.3f} ┐\n")
-        self.txt_results.insert(tk.END, f"└ {A[1,0]:8.3f}  {A[1,1]:8.3f} ┘\n\n")
+        # Step 1: System definition
+        self.txt_results.insert(tk.END, "PASO 1: DEFINICIÓN DEL SISTEMA\n")
+        self.txt_results.insert(tk.END, "=" * 35 + "\n")
         
-        # Determinant and trace
+        if self.input_mode.get() == "equations":
+            self.txt_results.insert(tk.END, f"Sistema original:\n")
+            self.txt_results.insert(tk.END, f"  x' = {self.x_prime_str.get()}\n")
+            self.txt_results.insert(tk.END, f"  y' = {self.y_prime_str.get()}\n\n")
+        
+        self.txt_results.insert(tk.END, f"En forma matricial: x' = Ax, donde:\n")
+        self.txt_results.insert(tk.END, f"A = ┌ {A[0,0]:6.2f}  {A[0,1]:6.2f} ┐\n")
+        self.txt_results.insert(tk.END, f"    └ {A[1,0]:6.2f}  {A[1,1]:6.2f} ┘\n\n")
+        
+        # Step 2: Characteristic polynomial
+        self.txt_results.insert(tk.END, "PASO 2: POLINOMIO CARACTERÍSTICO\n")
+        self.txt_results.insert(tk.END, "=" * 35 + "\n")
+        
         det_A = np.linalg.det(A)
         trace_A = np.trace(A)
-        self.txt_results.insert(tk.END, f"Determinante: {det_A:.6f}\n")
-        self.txt_results.insert(tk.END, f"Traza: {trace_A:.6f}\n\n")
         
-        # Eigenvalues
-        self.txt_results.insert(tk.END, "Autovalores:\n")
+        self.txt_results.insert(tk.END, f"Calculamos det(A - λI):\n")
+        self.txt_results.insert(tk.END, f"A - λI = ┌ {A[0,0]:.2f} - λ    {A[0,1]:6.2f} ┐\n")
+        self.txt_results.insert(tk.END, f"         └ {A[1,0]:6.2f}      {A[1,1]:.2f} - λ ┘\n\n")
+        
+        self.txt_results.insert(tk.END, f"det(A - λI) = ({A[0,0]:.2f} - λ)({A[1,1]:.2f} - λ) - ({A[0,1]:.2f})({A[1,0]:.2f})\n")
+        self.txt_results.insert(tk.END, f"            = λ² - ({trace_A:.2f})λ + ({det_A:.2f})\n")
+        self.txt_results.insert(tk.END, f"            = λ² - (traza)λ + (determinante)\n\n")
+        
+        self.txt_results.insert(tk.END, f"Traza(A) = {A[0,0]:.2f} + {A[1,1]:.2f} = {trace_A:.2f}\n")
+        self.txt_results.insert(tk.END, f"Det(A) = ({A[0,0]:.2f})({A[1,1]:.2f}) - ({A[0,1]:.2f})({A[1,0]:.2f}) = {det_A:.2f}\n\n")
+        
+        # Step 3: Eigenvalues calculation
+        self.txt_results.insert(tk.END, "PASO 3: CÁLCULO DE AUTOVALORES\n")
+        self.txt_results.insert(tk.END, "=" * 35 + "\n")
+        
+        self.txt_results.insert(tk.END, f"Resolvemos: λ² - {trace_A:.2f}λ + {det_A:.2f} = 0\n")
+        
+        # Show quadratic formula
+        discriminant = trace_A**2 - 4*det_A
+        self.txt_results.insert(tk.END, f"Usando fórmula cuadrática:\n")
+        self.txt_results.insert(tk.END, f"λ = (traza ± √(traza² - 4·det)) / 2\n")
+        self.txt_results.insert(tk.END, f"λ = ({trace_A:.2f} ± √({trace_A:.2f}² - 4·{det_A:.2f})) / 2\n")
+        self.txt_results.insert(tk.END, f"λ = ({trace_A:.2f} ± √{discriminant:.2f}) / 2\n\n")
+        
+        # Show eigenvalues
+        self.txt_results.insert(tk.END, "Autovalores obtenidos:\n")
         for i, val in enumerate(eigenvals):
             if np.isreal(val):
-                self.txt_results.insert(tk.END, f"λ{i+1} = {np.real(val):.6f}\n")
+                self.txt_results.insert(tk.END, f"λ{i+1} = {np.real(val):.2f}\n")
             else:
-                self.txt_results.insert(tk.END, f"λ{i+1} = {np.real(val):.6f} {'+' if np.imag(val) >= 0 else '-'} {abs(np.imag(val)):.6f}i\n")
+                real_part, imag_part = np.real(val), np.imag(val)
+                sign = '+' if imag_part >= 0 else '-'
+                self.txt_results.insert(tk.END, f"λ{i+1} = {real_part:.2f} {sign} {abs(imag_part):.2f}i\n")
         
-        # Eigenvectors (only for real eigenvalues)
+        # Interpretation of eigenvalues
+        self.txt_results.insert(tk.END, f"\nInterpretación del discriminante:\n")
+        if discriminant > 0:
+            self.txt_results.insert(tk.END, f"Δ = {discriminant:.2f} > 0 → Autovalores reales distintos\n")
+        elif discriminant == 0:
+            self.txt_results.insert(tk.END, f"Δ = {discriminant:.2f} = 0 → Autovalores reales iguales\n")
+        else:
+            self.txt_results.insert(tk.END, f"Δ = {discriminant:.2f} < 0 → Autovalores complejos conjugados\n")
+        
+        self.txt_results.insert(tk.END, "\n")
+        
+        # Step 4: Eigenvectors (only for real eigenvalues)
         if np.isreal(eigenvals[0]) and np.isreal(eigenvals[1]):
-            self.txt_results.insert(tk.END, "\nAutovectores:\n")
-            for i, vec in enumerate(eigenvecs.T):
+            self.txt_results.insert(tk.END, "PASO 4: CÁLCULO DE AUTOVECTORES\n")
+            self.txt_results.insert(tk.END, "=" * 35 + "\n")
+            
+            for i, val in enumerate(eigenvals):
+                lambda_val = np.real(val)
+                self.txt_results.insert(tk.END, f"Para λ{i+1} = {lambda_val:.2f}:\n")
+                self.txt_results.insert(tk.END, f"Resolvemos (A - λ{i+1}I)v = 0\n")
+                
+                # Calculate A - λI
+                A_lambda = A - lambda_val * np.eye(2)
+                self.txt_results.insert(tk.END, f"(A - {lambda_val:.2f}I) = ┌ {A_lambda[0,0]:8.2f}  {A_lambda[0,1]:8.2f} ┐\n")
+                self.txt_results.insert(tk.END, f"                         └ {A_lambda[1,0]:8.2f}  {A_lambda[1,1]:8.2f} ┘\n")
+                
+                # Show eigenvector
+                vec = eigenvecs[:, i]
                 if np.isreal(vec[0]) and np.isreal(vec[1]):
                     v1, v2 = np.real(vec[0]), np.real(vec[1])
-                    self.txt_results.insert(tk.END, f"v{i+1} = [{v1:8.6f}, {v2:8.6f}]ᵀ\n")
+                    # Normalize to simpler form if possible
+                    if abs(v1) > 1e-10:
+                        ratio = v2/v1
+                        self.txt_results.insert(tk.END, f"Autovector: v{i+1} = t·[1, {ratio:.2f}]ᵀ\n")
+                        self.txt_results.insert(tk.END, f"Forma normalizada: v{i+1} = [{v1:8.2f}, {v2:8.2f}]ᵀ\n")
+                    else:
+                        self.txt_results.insert(tk.END, f"Autovector: v{i+1} = [{v1:8.2f}, {v2:8.2f}]ᵀ\n")
+                self.txt_results.insert(tk.END, "\n")
         
-        # Classification
-        self.txt_results.insert(tk.END, f"\nClasificación: {classification}\n\n")
+        # Step 5: Classification
+        self.txt_results.insert(tk.END, "PASO 5: CLASIFICACIÓN DEL PUNTO CRÍTICO\n")
+        self.txt_results.insert(tk.END, "=" * 40 + "\n")
         
-        # Stability analysis
-        self.txt_results.insert(tk.END, "Análisis de estabilidad:\n")
-        if "estable" in classification.lower() and "inestable" not in classification.lower():
-            self.txt_results.insert(tk.END, "• El origen es estable (atractor)\n")
-            self.txt_results.insert(tk.END, "• Todas las trayectorias convergen al origen\n")
-        elif "inestable" in classification.lower():
-            self.txt_results.insert(tk.END, "• El origen es inestable\n")
-            if "silla" in classification.lower():
-                self.txt_results.insert(tk.END, "• Existe una variedad estable e inestable\n")
-            else:
-                self.txt_results.insert(tk.END, "• Las trayectorias se alejan del origen\n")
-        elif "centro" in classification.lower():
-            self.txt_results.insert(tk.END, "• El origen es centro\n")
-            self.txt_results.insert(tk.END, "• Las trayectorias son órbitas cerradas\n")
+        self.txt_results.insert(tk.END, f"Criterios de clasificación:\n")
+        self.txt_results.insert(tk.END, f"• Determinante = {det_A:.2f}\n")
+        self.txt_results.insert(tk.END, f"• Traza = {trace_A:.2f}\n")
+        self.txt_results.insert(tk.END, f"• Discriminante = {discriminant:.2f}\n\n")
+        
+        # Detailed classification logic
+        if np.isreal(eigenvals[0]) and np.isreal(eigenvals[1]):
+            lambda1, lambda2 = np.real(eigenvals[0]), np.real(eigenvals[1])
+            self.txt_results.insert(tk.END, f"Autovalores reales: λ₁ = {lambda1:.2f}, λ₂ = {lambda2:.2f}\n")
+            
+            if lambda1 > 0 and lambda2 > 0:
+                self.txt_results.insert(tk.END, f"Ambos autovalores positivos → NODO INESTABLE\n")
+                self.txt_results.insert(tk.END, f"Las trayectorias se alejan del origen\n")
+            elif lambda1 < 0 and lambda2 < 0:
+                self.txt_results.insert(tk.END, f"Ambos autovalores negativos → NODO ESTABLE\n")
+                self.txt_results.insert(tk.END, f"Las trayectorias convergen al origen\n")
+            elif (lambda1 > 0 and lambda2 < 0) or (lambda1 < 0 and lambda2 > 0):
+                self.txt_results.insert(tk.END, f"Autovalores de signo opuesto → PUNTO SILLA\n")
+                self.txt_results.insert(tk.END, f"Existe variedad estable e inestable\n")
+            elif lambda1 == 0 or lambda2 == 0:
+                self.txt_results.insert(tk.END, f"Autovalor cero → CASO DEGENERADO\n")
+        else:
+            real_part = np.real(eigenvals[0])
+            imag_part = np.imag(eigenvals[0])
+            self.txt_results.insert(tk.END, f"Autovalores complejos: {real_part:.2f} ± {abs(imag_part):.2f}i\n")
+            
+            if real_part > 0:
+                self.txt_results.insert(tk.END, f"Parte real positiva → ESPIRAL INESTABLE\n")
+                self.txt_results.insert(tk.END, f"Las trayectorias espiralan alejándose del origen\n")
+            elif real_part < 0:
+                self.txt_results.insert(tk.END, f"Parte real negativa → ESPIRAL ESTABLE\n")
+                self.txt_results.insert(tk.END, f"Las trayectorias espiralan hacia el origen\n")
+            elif real_part == 0:
+                self.txt_results.insert(tk.END, f"Parte real cero → CENTRO\n")
+                self.txt_results.insert(tk.END, f"Las trayectorias son órbitas cerradas\n")
+        
+        self.txt_results.insert(tk.END, f"\nCLASIFICACIÓN FINAL: {classification}\n\n")
+        
+        # Step 6: Solution form
+        self.txt_results.insert(tk.END, "PASO 6: FORMA GENERAL DE LA SOLUCIÓN\n")
+        self.txt_results.insert(tk.END, "=" * 40 + "\n")
+        
+        if np.isreal(eigenvals[0]) and np.isreal(eigenvals[1]):
+            lambda1, lambda2 = np.real(eigenvals[0]), np.real(eigenvals[1])
+            v1, v2 = eigenvecs[:, 0], eigenvecs[:, 1]
+            self.txt_results.insert(tk.END, f"Para autovalores reales:\n")
+            self.txt_results.insert(tk.END, f"x(t) = c₁·e^({lambda1:.2f}t)·v₁ + c₂·e^({lambda2:.2f}t)·v₂\n")
+            self.txt_results.insert(tk.END, f"donde c₁, c₂ son constantes determinadas por condiciones iniciales\n")
+        else:
+            real_part = np.real(eigenvals[0])
+            imag_part = np.imag(eigenvals[0])
+            self.txt_results.insert(tk.END, f"Para autovalores complejos:\n")
+            self.txt_results.insert(tk.END, f"x(t) = e^({real_part:.2f}t)[c₁·cos({abs(imag_part):.2f}t)·u + c₂·sen({abs(imag_part):.2f}t)·v]\n")
+            self.txt_results.insert(tk.END, f"donde u, v son las partes real e imaginaria del autovector\n")
         
         self.txt_results.config(state='disabled')
 
@@ -634,7 +741,7 @@ class LinearSystem2DApp(tk.Tk):
                     
                     color = 'red' if val > 0 else 'blue'
                     linestyle = '-' if val > 0 else '--'
-                    label = f'Autovector {i+1} (λ={val:.3f})'
+                    label = f'Autovector {i+1} (λ={val:.2f})'
                     
                     self.ax_phase.plot(x_line[mask], y_line[mask], color=color, 
                                      linestyle=linestyle, linewidth=2, label=label)
@@ -642,7 +749,7 @@ class LinearSystem2DApp(tk.Tk):
                     # Vertical eigenvector
                     self.ax_phase.axvline(x=0, color='red' if val > 0 else 'blue',
                                         linestyle='-' if val > 0 else '--', linewidth=2,
-                                        label=f'Autovector {i+1} (λ={val:.3f})')
+                                        label=f'Autovector {i+1} (λ={val:.2f})')
         
         # Plot some sample trajectories
         self._plot_sample_trajectories(A)
