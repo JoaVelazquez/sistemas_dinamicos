@@ -17,6 +17,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
+# Increase the agg.path.chunksize to handle more complex plots
+matplotlib.rcParams['agg.path.chunksize'] = 20000
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
@@ -52,8 +56,8 @@ class NonlinearSystem2DApp:
         self.show_separatrices = tk.BooleanVar(value=False)
         
         # Trajectory options
-        self.num_trajectories = tk.IntVar(value=10)
-        self.trajectory_direction = tk.StringVar(value="both")  # "forward", "backward", "both"
+        self.num_trajectories = tk.IntVar(value=5)
+        self.trajectory_direction = tk.StringVar(value="forward")  # "forward", "backward", "both"
         
         # Storage for analysis
         self.equilibrium_points = []
@@ -656,29 +660,49 @@ class NonlinearSystem2DApp:
                             x0 = x_eq + direction * eps * eigvec[0]
                             y0 = y_eq + direction * eps * eigvec[1]
                             
-                            # Integrate
+                            # Determine color based on eigenvalue sign
                             if eig.real < 0:  # Stable direction - integrate backward
-                                t = np.linspace(0, -self.t_max.get(), 1000)
+                                t = np.linspace(0, -self.t_max.get(), 300)  # Reduced from 1000
                                 color = 'cyan'
                                 linewidth = 2
                             else:  # Unstable direction - integrate forward
-                                t = np.linspace(0, self.t_max.get(), 1000)
+                                t = np.linspace(0, self.t_max.get(), 300)  # Reduced from 1000
                                 color = 'magenta'
                                 linewidth = 2
                             
                             try:
-                                sol = odeint(lambda state, t: [f_x(state[0], state[1]), 
-                                                              f_y(state[0], state[1])], 
-                                           [x0, y0], t)
-                                ax.plot(sol[:, 0], sol[:, 1], color=color, linewidth=linewidth, 
-                                       alpha=0.7, linestyle='--')
+                                def system(state, t):
+                                    x, y = state
+                                    try:
+                                        dx = f_x(x, y)
+                                        dy = f_y(x, y)
+                                        dx = float(dx) if np.isscalar(dx) else float(dx[0]) if hasattr(dx, '__len__') else 0.0
+                                        dy = float(dy) if np.isscalar(dy) else float(dy[0]) if hasattr(dy, '__len__') else 0.0
+                                        if not np.isfinite(dx):
+                                            dx = 0.0
+                                        if not np.isfinite(dy):
+                                            dy = 0.0
+                                        return [dx, dy]
+                                    except:
+                                        return [0.0, 0.0]
+                                
+                                sol = odeint(system, [x0, y0], t)
+                                
+                                # Filter valid points
+                                if len(sol) > 1:
+                                    valid_mask = np.isfinite(sol[:, 0]) & np.isfinite(sol[:, 1])
+                                    if np.any(valid_mask):
+                                        sol_valid = sol[valid_mask]
+                                        if len(sol_valid) > 1:
+                                            ax.plot(sol_valid[:, 0], sol_valid[:, 1], color=color, linewidth=linewidth, 
+                                                   alpha=0.7, linestyle='--')
                             except:
                                 pass
                                 
     def _plot_sample_trajectories(self, ax, f_x, f_y):
         """Plot some random sample trajectories."""
-        # Random initial conditions
-        num_traj = min(self.num_trajectories.get(), 15)
+        # Random initial conditions - reduced number
+        num_traj = min(self.num_trajectories.get(), 8)
         
         x_min, x_max = self.x_min.get(), self.x_max.get()
         y_min, y_max = self.y_min.get(), self.y_max.get()
@@ -698,65 +722,124 @@ class NonlinearSystem2DApp:
         
         def system(state, t):
             x, y = state
-            return [f_x(x, y), f_y(x, y)]
+            try:
+                dx = f_x(x, y)
+                dy = f_y(x, y)
+                # Convert to float and check validity
+                dx = float(dx) if np.isscalar(dx) else float(dx[0]) if hasattr(dx, '__len__') else 0.0
+                dy = float(dy) if np.isscalar(dy) else float(dy[0]) if hasattr(dy, '__len__') else 0.0
+                
+                # Check for NaN or infinity
+                if not np.isfinite(dx):
+                    dx = 0.0
+                if not np.isfinite(dy):
+                    dy = 0.0
+                    
+                return [dx, dy]
+            except:
+                return [0.0, 0.0]
         
-        # Forward integration
+        # Forward integration - reduced points
         if direction in ["forward", "both"]:
-            t_forward = np.linspace(0, t_max, 500)
+            t_forward = np.linspace(0, t_max, 200)  # Reduced from 500
             try:
                 sol_forward = odeint(system, [x0, y0], t_forward)
-                ax.plot(sol_forward[:, 0], sol_forward[:, 1], color=color, alpha=alpha, 
-                       linewidth=linewidth, zorder=3)
-                # Add arrowhead
-                if len(sol_forward) > 10:
-                    idx = len(sol_forward) // 2
-                    dx = sol_forward[idx+1, 0] - sol_forward[idx, 0]
-                    dy = sol_forward[idx+1, 1] - sol_forward[idx, 1]
-                    ax.arrow(sol_forward[idx, 0], sol_forward[idx, 1], dx, dy,
-                            head_width=0.1, head_length=0.1, fc=color, ec=color, alpha=alpha)
+                
+                # Check if solution is valid
+                if len(sol_forward) > 1:
+                    # Filter out any invalid points
+                    valid_mask = np.isfinite(sol_forward[:, 0]) & np.isfinite(sol_forward[:, 1])
+                    if np.any(valid_mask):
+                        sol_valid = sol_forward[valid_mask]
+                        if len(sol_valid) > 1:
+                            ax.plot(sol_valid[:, 0], sol_valid[:, 1], color=color, alpha=alpha, 
+                                   linewidth=linewidth, zorder=3)
             except:
                 pass
         
-        # Backward integration
+        # Backward integration - reduced points
         if direction in ["backward", "both"]:
-            t_backward = np.linspace(0, -t_max, 500)
+            t_backward = np.linspace(0, -t_max, 200)  # Reduced from 500
             try:
                 sol_backward = odeint(system, [x0, y0], t_backward)
-                ax.plot(sol_backward[:, 0], sol_backward[:, 1], color=color, alpha=alpha, 
-                       linewidth=linewidth, linestyle='--', zorder=3)
+                
+                # Check if solution is valid
+                if len(sol_backward) > 1:
+                    # Filter out any invalid points
+                    valid_mask = np.isfinite(sol_backward[:, 0]) & np.isfinite(sol_backward[:, 1])
+                    if np.any(valid_mask):
+                        sol_valid = sol_backward[valid_mask]
+                        if len(sol_valid) > 1:
+                            ax.plot(sol_valid[:, 0], sol_valid[:, 1], color=color, alpha=alpha, 
+                                   linewidth=linewidth, linestyle='--', zorder=3)
             except:
                 pass
         
         # Mark initial point
-        ax.plot(x0, y0, 'o', color=color, markersize=6, markeredgecolor='black', 
-               markeredgewidth=0.5, zorder=4)
+        try:
+            ax.plot(x0, y0, 'o', color=color, markersize=6, markeredgecolor='black', 
+                   markeredgewidth=0.5, zorder=4)
+        except:
+            pass
         
     def _on_click(self, event, ax, f_x, f_y, canvas):
         """Handle click event to plot trajectory from clicked point."""
+        # Validate click is in the axes
         if event.inaxes != ax:
             return
         
+        # Get coordinates
         x0, y0 = event.xdata, event.ydata
+        
+        # Validate coordinates are not None and are finite
+        if x0 is None or y0 is None:
+            return
+        
+        if not np.isfinite(x0) or not np.isfinite(y0):
+            return
+        
+        # Check if coordinates are within plot bounds
+        x_min, x_max = self.x_min.get(), self.x_max.get()
+        y_min, y_max = self.y_min.get(), self.y_max.get()
+        
+        if not (x_min <= x0 <= x_max and y_min <= y0 <= y_max):
+            return
         
         # Store clicked trajectory
         self.clicked_trajectories.append((x0, y0))
         
-        # Plot trajectory
-        self._plot_trajectory(ax, f_x, f_y, x0, y0, color='red', alpha=0.9, linewidth=2)
-        
-        canvas.draw()
+        try:
+            # Plot trajectory
+            self._plot_trajectory(ax, f_x, f_y, x0, y0, color='red', alpha=0.9, linewidth=2)
+            
+            # Redraw canvas
+            canvas.draw_idle()
+        except Exception as e:
+            print(f"Error plotting trajectory: {e}")
+            # Remove the failed trajectory from list
+            if self.clicked_trajectories and self.clicked_trajectories[-1] == (x0, y0):
+                self.clicked_trajectories.pop()
         
     def clear_clicked_trajectories(self):
         """Clear clicked trajectories and replot."""
         self.clicked_trajectories = []
         if self.current_system:
-            self._plot_phase_portrait()
+            try:
+                self._plot_phase_portrait()
+            except Exception as e:
+                print(f"Error reploting: {e}")
             
     def clear_plots(self):
         """Clear all plots."""
         for widget in self.right_panel.winfo_children():
             widget.destroy()
         self.clicked_trajectories = []
+        if self.click_cid:
+            try:
+                # Note: click_cid will be recreated on next plot
+                self.click_cid = None
+            except:
+                pass
 
 
 def main():
