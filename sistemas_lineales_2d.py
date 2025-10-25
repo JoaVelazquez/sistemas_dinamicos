@@ -41,12 +41,20 @@ class LinearSystem2DApp(tk.Tk):
         self.y_prime_str = tk.StringVar(value="-y")  # y' = 
         self.input_mode = tk.StringVar(value="matrix")  # "matrix" or "equations"
         
+        # Forcing functions for non-homogeneous systems
+        self.f1_str = tk.StringVar(value="0")  # f₁(t) for x' equation
+        self.f2_str = tk.StringVar(value="0")  # f₂(t) for y' equation
+        self.use_forcing = tk.BooleanVar(value=False)
+        
         # Plot parameters
         self.x_min = tk.DoubleVar(value=-3.0)
         self.x_max = tk.DoubleVar(value=3.0)
         self.y_min = tk.DoubleVar(value=-3.0)
         self.y_max = tk.DoubleVar(value=3.0)
         self.time_max = tk.DoubleVar(value=5.0)
+        
+        # Poincaré map parameter
+        self.poincare_dt = tk.DoubleVar(value=0.5)
         
         # Exercise selector
         self.exercise_var = tk.StringVar(value="Manual")
@@ -181,8 +189,49 @@ class LinearSystem2DApp(tk.Tk):
         ttk.Label(params_frame, text="Tiempo máx:").grid(row=2, column=0, sticky="w", padx=4, pady=2)
         tk.Entry(params_frame, textvariable=self.time_max, width=6).grid(row=2, column=1, padx=2, pady=2)
         
+        # Forcing functions for non-homogeneous systems
+        forcing_frame = ttk.LabelFrame(matrix_frame, text="Funciones de Forzamiento (Opcional)")
+        forcing_frame.pack(fill=tk.X, padx=8, pady=(8, 8))
+        
+        # Enable forcing checkbox
+        ttk.Checkbutton(forcing_frame, text="Activar sistema no homogéneo: x' = Ax + f(t)", 
+                       variable=self.use_forcing,
+                       command=self._toggle_forcing).pack(anchor="w", padx=4, pady=4)
+        
+        # Forcing function inputs
+        self.forcing_inputs_frame = ttk.Frame(forcing_frame)
+        self.forcing_inputs_frame.pack(fill=tk.X, padx=4, pady=4)
+        
+        # f₁(t) for x' equation
+        f1_frame = ttk.Frame(self.forcing_inputs_frame)
+        f1_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(f1_frame, text="f₁(t) =", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Entry(f1_frame, textvariable=self.f1_str, width=25, font=("Arial", 10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # f₂(t) for y' equation
+        f2_frame = ttk.Frame(self.forcing_inputs_frame)
+        f2_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(f2_frame, text="f₂(t) =", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Entry(f2_frame, textvariable=self.f2_str, width=25, font=("Arial", 10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Help text for forcing
+        help_text = "Ejemplos: sin(t), cos(2*t), exp(-t), t, t**2, 5 (constante)"
+        ttk.Label(self.forcing_inputs_frame, text=help_text, font=("Arial", 8), foreground="gray").pack(anchor="w", pady=(4, 0))
+        
+        # Initially disable forcing inputs
+        self._toggle_forcing()
+        
         # Show initial mode
         self._on_mode_change()
+
+    def _toggle_forcing(self):
+        """Enable/disable forcing function inputs."""
+        state = 'normal' if self.use_forcing.get() else 'disabled'
+        for widget in self.forcing_inputs_frame.winfo_children():
+            if isinstance(widget, ttk.Frame):
+                for child in widget.winfo_children():
+                    if isinstance(child, tk.Entry):
+                        child.config(state=state)
 
     def _create_matrix_mode(self):
         """Create matrix input widgets."""
@@ -337,12 +386,37 @@ class LinearSystem2DApp(tk.Tk):
 
     def _create_right_panel_content(self):
         """Create the right panel with plots."""
-        # Create vertical layout for multiple plots
-        plots_paned = ttk.Panedwindow(self.right_panel, orient=tk.VERTICAL)
+        # Create a canvas with scrollbar for the plots
+        canvas_container = tk.Canvas(self.right_panel, borderwidth=0)
+        scrollbar = ttk.Scrollbar(self.right_panel, orient="vertical", command=canvas_container.yview)
+        self.scrollable_frame = ttk.Frame(canvas_container)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas_container.configure(scrollregion=canvas_container.bbox("all"))
+        )
+        
+        canvas_container.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas_container.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Bind mouse wheel to scrolling
+        def _on_mousewheel(event):
+            canvas_container.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas_container.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        # Create vertical layout for multiple plots within scrollable frame
+        plots_paned = ttk.Panedwindow(self.scrollable_frame, orient=tk.VERTICAL)
         plots_paned.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=4)
         
         # Phase portrait plot
         self._create_phase_portrait_panel(plots_paned)
+        
+        # Poincaré map plot
+        self._create_poincare_panel(plots_paned)
         
         # Solution trajectories plot
         self._create_trajectories_panel(plots_paned)
@@ -353,9 +427,29 @@ class LinearSystem2DApp(tk.Tk):
         parent.add(phase_frame, weight=1)
         
         self.fig_phase, self.ax_phase, self.canvas_phase = self._create_figure_canvas(
-            phase_frame, figsize=(8, 6)
+            phase_frame, figsize=(7, 5)
         )
         self.canvas_phase.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+    def _create_poincare_panel(self, parent):
+        """Create Poincaré map panel."""
+        poincare_frame = ttk.LabelFrame(parent, text="Mapa de Poincaré")
+        parent.add(poincare_frame, weight=1)
+        
+        # Add control for sampling interval
+        control_frame = ttk.Frame(poincare_frame)
+        control_frame.pack(side=tk.TOP, fill=tk.X, padx=4, pady=2)
+        
+        ttk.Label(control_frame, text="Intervalo de muestreo Δt:").pack(side=tk.LEFT, padx=4)
+        tk.Entry(control_frame, textvariable=self.poincare_dt, width=8).pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(control_frame, text="💡 Puntos discretos del flujo temporal", 
+                 font=("Arial", 9), foreground="blue").pack(side=tk.LEFT, padx=10)
+        
+        self.fig_poincare, self.ax_poincare, self.canvas_poincare = self._create_figure_canvas(
+            poincare_frame, figsize=(7, 5)
+        )
+        self.canvas_poincare.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=4, pady=4)
 
     def _create_trajectories_panel(self, parent):
         """Create solution trajectories panel."""
@@ -363,7 +457,7 @@ class LinearSystem2DApp(tk.Tk):
         parent.add(traj_frame, weight=1)
         
         self.fig_traj, self.ax_traj, self.canvas_traj = self._create_figure_canvas(
-            traj_frame, figsize=(8, 4)
+            traj_frame, figsize=(7, 3.5)
         )
         self.canvas_traj.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=4, pady=4)
 
@@ -494,6 +588,9 @@ class LinearSystem2DApp(tk.Tk):
             
             # Plot phase portrait
             self._plot_phase_portrait(A)
+            
+            # Plot Poincaré map
+            self._plot_poincare_map(A)
             
             # Plot solution trajectories
             self._plot_solution_trajectories(A)
@@ -721,8 +818,12 @@ class LinearSystem2DApp(tk.Tk):
         DX_norm = DX / M
         DY_norm = DY / M
         
-        # Plot vector field
-        self.ax_phase.quiver(X, Y, DX_norm, DY_norm, M, cmap='viridis', alpha=0.6, scale=30)
+        # Plot vector field with improved arrow orientation
+        self.ax_phase.quiver(X, Y, DX_norm, DY_norm, M, 
+                           cmap='viridis', alpha=0.6, 
+                           scale=25, scale_units='xy',
+                           width=0.004, headwidth=4, headlength=5,
+                           pivot='mid')  # Center arrows on grid points
         
         # Plot eigenspaces for real eigenvalues
         if np.isreal(self._current_eigenvalues[0]) and np.isreal(self._current_eigenvalues[1]):
@@ -766,6 +867,131 @@ class LinearSystem2DApp(tk.Tk):
         self.ax_phase.legend()
         
         self.canvas_phase.draw()
+
+    def _plot_poincare_map(self, A):
+        """Plot Poincaré map showing discrete-time sampling of trajectories."""
+        self.ax_poincare.clear()
+        
+        x_min, x_max = self.x_min.get(), self.x_max.get()
+        y_min, y_max = self.y_min.get(), self.y_max.get()
+        t_max = self.time_max.get()
+        dt = self.poincare_dt.get()
+        
+        # Generate initial conditions (same as sample trajectories)
+        initial_conditions = [
+            (x_max * 0.8, 0), (-x_max * 0.8, 0),
+            (0, y_max * 0.8), (0, -y_max * 0.8),
+            (x_max * 0.6, y_max * 0.6), (-x_max * 0.6, -y_max * 0.6),
+            (x_max * 0.6, -y_max * 0.6), (-x_max * 0.6, y_max * 0.6)
+        ]
+        
+        # Create discrete time samples
+        t_samples = np.arange(0, t_max, dt)
+        
+        # Check if using forcing functions
+        use_forcing = self.use_forcing.get()
+        if use_forcing:
+            # Parse forcing functions
+            try:
+                import sympy as sp
+                t_sym = sp.Symbol('t')
+                f1_expr = sp.sympify(self.f1_str.get())
+                f2_expr = sp.sympify(self.f2_str.get())
+                f1_func = sp.lambdify(t_sym, f1_expr, 'numpy')
+                f2_func = sp.lambdify(t_sym, f2_expr, 'numpy')
+            except:
+                messagebox.showerror("Error", "Error al parsear funciones de forzamiento")
+                return
+        
+        colors = plt.cm.tab10(np.linspace(0, 1, len(initial_conditions)))
+        
+        for idx, (x0, y0) in enumerate(initial_conditions):
+            # Skip if initial condition is at origin
+            if abs(x0) < 1e-10 and abs(y0) < 1e-10:
+                continue
+            
+            # Solve the system for discrete time points
+            try:
+                eigenvals, eigenvecs = self._current_eigenvalues, self._current_eigenvectors
+                
+                x_points = []
+                y_points = []
+                
+                if use_forcing:
+                    # Solve non-homogeneous system for all time samples at once
+                    solution = self._solve_nonhomogeneous(A, np.array([x0, y0]), t_samples, f1_func, f2_func)
+                    for i in range(len(t_samples)):
+                        x_t, y_t = solution[i, 0], solution[i, 1]
+                        if x_min <= x_t <= x_max and y_min <= y_t <= y_max:
+                            x_points.append(x_t)
+                            y_points.append(y_t)
+                else:
+                    # Homogeneous system
+                    for t in t_samples:
+                        if np.isreal(eigenvals[0]) and np.isreal(eigenvals[1]):
+                            # Real eigenvalues case
+                            solution = self._solve_real_eigenvalues(A, np.array([x0, y0]), np.array([t]))
+                        else:
+                            # Complex eigenvalues case
+                            solution = self._solve_complex_eigenvalues(A, np.array([x0, y0]), np.array([t]))
+                        
+                        x_t = solution[0, 0]
+                        y_t = solution[1, 0]
+                        
+                        # Check if point is within bounds
+                        if x_min <= x_t <= x_max and y_min <= y_t <= y_max:
+                            x_points.append(x_t)
+                            y_points.append(y_t)
+                
+                # Plot discrete points
+                if x_points:
+                    self.ax_poincare.scatter(x_points, y_points, c=[colors[idx]], 
+                                            s=30, alpha=0.7, edgecolors='black', linewidth=0.5,
+                                            label=f'CI: ({x0:.1f}, {y0:.1f})')
+                    
+                    # Connect points with thin lines to show evolution
+                    self.ax_poincare.plot(x_points, y_points, c=colors[idx], 
+                                         alpha=0.2, linewidth=0.5, linestyle=':')
+                    
+            except Exception as e:
+                continue
+        
+        # Plot eigenvector directions if real
+        if np.isreal(self._current_eigenvalues[0]) and np.isreal(self._current_eigenvalues[1]):
+            eigenvals = np.real(self._current_eigenvalues)
+            eigenvecs = np.real(self._current_eigenvectors)
+            
+            for i, (val, vec) in enumerate(zip(eigenvals, eigenvecs.T)):
+                if abs(vec[1]) > 1e-10:
+                    slope = vec[1] / vec[0]
+                    x_line = np.linspace(x_min, x_max, 100)
+                    y_line = slope * x_line
+                    mask = (y_line >= y_min) & (y_line <= y_max)
+                    
+                    color = 'red' if val > 0 else 'blue'
+                    linestyle = '--'
+                    self.ax_poincare.plot(x_line[mask], y_line[mask], color=color,
+                                         linestyle=linestyle, linewidth=1, alpha=0.4)
+                else:
+                    color = 'red' if val > 0 else 'blue'
+                    self.ax_poincare.axvline(x=0, color=color, linestyle='--', 
+                                           linewidth=1, alpha=0.4)
+        
+        # Formatting
+        self.ax_poincare.set_xlim(x_min, x_max)
+        self.ax_poincare.set_ylim(y_min, y_max)
+        self.ax_poincare.set_xlabel('x')
+        self.ax_poincare.set_ylabel('y')
+        
+        # Title depends on whether forcing is used
+        title_suffix = " (con forzamiento)" if use_forcing else ""
+        self.ax_poincare.set_title(f'Mapa de Poincaré (Δt = {dt}){title_suffix} - {self._current_classification}')
+        self.ax_poincare.grid(True, alpha=0.3)
+        self.ax_poincare.axhline(y=0, color='k', linewidth=0.5)
+        self.ax_poincare.axvline(x=0, color='k', linewidth=0.5)
+        self.ax_poincare.legend(fontsize=8, loc='best')
+        
+        self.canvas_poincare.draw()
 
     def _plot_sample_trajectories(self, A):
         """Plot sample solution trajectories."""
@@ -848,6 +1074,28 @@ class LinearSystem2DApp(tk.Tk):
             
         return solution
 
+    def _solve_nonhomogeneous(self, A, x0, t, f1_func, f2_func):
+        """
+        Solve non-homogeneous system: x' = Ax + f(t)
+        Using variation of parameters / integrating factor method.
+        Solution: x(t) = exp(At)x₀ + ∫₀ᵗ exp(A(t-s))f(s) ds
+        """
+        from scipy.linalg import expm
+        from scipy.integrate import odeint
+        
+        # Define the ODE system
+        def system(state, time):
+            x, y = state
+            f1 = f1_func(time)
+            f2 = f2_func(time)
+            dx = A[0,0]*x + A[0,1]*y + f1
+            dy = A[1,0]*x + A[1,1]*y + f2
+            return [dx, dy]
+        
+        # Solve using numerical integration
+        solution = odeint(system, x0, t)
+        return solution
+
     def _plot_solution_trajectories(self, A):
         """Plot x(t) and y(t) vs time for selected initial conditions."""
         self.ax_traj.clear()
@@ -897,6 +1145,12 @@ class LinearSystem2DApp(tk.Tk):
         self.ax_phase.set_xlabel('x')
         self.ax_phase.set_ylabel('y')
         self.canvas_phase.draw()
+        
+        self.ax_poincare.clear()
+        self.ax_poincare.set_title('Mapa de Poincaré')
+        self.ax_poincare.set_xlabel('x')
+        self.ax_poincare.set_ylabel('y')
+        self.canvas_poincare.draw()
         
         self.ax_traj.clear()
         self.ax_traj.set_title('Trayectorias de Solución')
