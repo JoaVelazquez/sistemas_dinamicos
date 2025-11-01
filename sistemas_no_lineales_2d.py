@@ -53,10 +53,10 @@ class NonlinearSystem2DApp:
         self.show_nullclines = tk.BooleanVar(value=True)
         self.show_equilibria = tk.BooleanVar(value=True)
         self.show_vector_field = tk.BooleanVar(value=True)
-        self.show_separatrices = tk.BooleanVar(value=False)
+        self.show_separatrices = tk.BooleanVar(value=False)  # Off by default
         
         # Trajectory options
-        self.num_trajectories = tk.IntVar(value=5)
+        self.num_trajectories = tk.IntVar(value=5)  # Reduced from 10
         self.trajectory_direction = tk.StringVar(value="forward")  # "forward", "backward", "both"
         
         # Storage for analysis
@@ -311,6 +311,9 @@ class NonlinearSystem2DApp:
             self.txt_results.insert(tk.END, f"x' = {x_prime_expr}\n")
             self.txt_results.insert(tk.END, f"y' = {y_prime_expr}\n\n")
             
+            # Check if system is conservative (Hamiltonian)
+            self._check_conservative_system(x_prime_expr, y_prime_expr)
+            
             # Find equilibrium points
             self._find_equilibrium_points(x_prime_expr, y_prime_expr)
             
@@ -322,6 +325,143 @@ class NonlinearSystem2DApp:
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al analizar el sistema:\n{str(e)}")
+    
+    def _check_conservative_system(self, x_prime_expr, y_prime_expr):
+        """
+        Check if the system is conservative (Hamiltonian).
+        A system is conservative if there exists H(x,y) such that:
+        x' = ∂H/∂y and y' = -∂H/∂x
+        
+        This is equivalent to checking if:
+        ∂(x')/∂x + ∂(y')/∂y = 0 (divergence-free condition)
+        """
+        x, y = sp.symbols('x y')
+        
+        self.txt_results.insert(tk.END, "─" * 50 + "\n")
+        self.txt_results.insert(tk.END, "ANÁLISIS DE CONSERVACIÓN (Hamiltoniano)\n")
+        self.txt_results.insert(tk.END, "─" * 50 + "\n\n")
+        
+        try:
+            # Compute divergence: ∂(x')/∂x + ∂(y')/∂y
+            div_x = sp.diff(x_prime_expr, x)
+            div_y = sp.diff(y_prime_expr, y)
+            divergence = div_x + div_y
+            divergence_simplified = sp.simplify(divergence)
+            
+            self.txt_results.insert(tk.END, f"Divergencia del campo vectorial:\n")
+            self.txt_results.insert(tk.END, f"  ∇·F = ∂(x')/∂x + ∂(y')/∂y\n")
+            self.txt_results.insert(tk.END, f"      = {div_x} + {div_y}\n")
+            self.txt_results.insert(tk.END, f"      = {divergence_simplified}\n\n")
+            
+            # Check if divergence is zero
+            is_conservative = divergence_simplified == 0
+            
+            if is_conservative:
+                self.txt_results.insert(tk.END, "✓ SISTEMA CONSERVATIVO (Hamiltoniano)\n")
+                self.txt_results.insert(tk.END, "  La divergencia es cero.\n")
+                self.txt_results.insert(tk.END, "  Existe una función Hamiltoniana H(x,y) tal que:\n")
+                self.txt_results.insert(tk.END, "    x' = ∂H/∂y\n")
+                self.txt_results.insert(tk.END, "    y' = -∂H/∂x\n\n")
+                
+                # Try to find the Hamiltonian
+                try:
+                    H_found = None
+                    
+                    # Method 1: Integrate y' with respect to x and add function of y
+                    # H = -∫ y' dx
+                    try:
+                        H1 = -sp.integrate(y_prime_expr, x)
+                        # Add arbitrary function g(y) and determine it
+                        g = sp.Function('g')(y)
+                        H_candidate = H1 + g
+                        
+                        # Check: ∂H/∂y should equal x'
+                        dH_dy = sp.diff(H_candidate, y)
+                        
+                        # Solve for g(y)
+                        g_expr = sp.integrate(x_prime_expr - sp.diff(H1, y), y)
+                        H_final = H1 + g_expr
+                        
+                        # Verify
+                        check_x = sp.simplify(sp.diff(H_final, y) - x_prime_expr)
+                        check_y = sp.simplify(sp.diff(H_final, x) + y_prime_expr)
+                        
+                        if check_x == 0 and check_y == 0:
+                            H_found = H_final
+                    except:
+                        pass
+                    
+                    # Method 2: Integrate x' with respect to y and add function of x
+                    # H = ∫ x' dy
+                    if H_found is None:
+                        try:
+                            H2 = sp.integrate(x_prime_expr, y)
+                            # Add arbitrary function f(x) and determine it
+                            f = sp.Function('f')(x)
+                            H_candidate = H2 + f
+                            
+                            # Check: -∂H/∂x should equal y'
+                            dH_dx = sp.diff(H_candidate, x)
+                            
+                            # Solve for f(x)
+                            f_expr = -sp.integrate(sp.diff(H2, x) + y_prime_expr, x)
+                            H_final = H2 + f_expr
+                            
+                            # Verify
+                            check_x = sp.simplify(sp.diff(H_final, y) - x_prime_expr)
+                            check_y = sp.simplify(sp.diff(H_final, x) + y_prime_expr)
+                            
+                            if check_x == 0 and check_y == 0:
+                                H_found = H_final
+                        except:
+                            pass
+                    
+                    # Method 3: Direct construction for simple cases
+                    if H_found is None:
+                        try:
+                            # For systems like x' = P(y), y' = Q(x)
+                            # H = ∫ P(y) dy - ∫ Q(x) dx
+                            H3 = sp.integrate(x_prime_expr, y) - sp.integrate(y_prime_expr, x)
+                            
+                            # Verify
+                            check_x = sp.simplify(sp.diff(H3, y) - x_prime_expr)
+                            check_y = sp.simplify(sp.diff(H3, x) + y_prime_expr)
+                            
+                            if check_x == 0 and check_y == 0:
+                                H_found = H3
+                        except:
+                            pass
+                    
+                    if H_found is not None:
+                        H_simplified = sp.simplify(H_found)
+                        self.txt_results.insert(tk.END, f"  Función Hamiltoniana encontrada:\n")
+                        self.txt_results.insert(tk.END, f"    H(x,y) = {H_simplified} + C\n\n")
+                        self.txt_results.insert(tk.END, "  Las curvas de nivel H(x,y) = constante son órbitas del sistema.\n")
+                        self.txt_results.insert(tk.END, "  La energía se conserva a lo largo de las trayectorias.\n")
+                    else:
+                        self.txt_results.insert(tk.END, "  El sistema es conservativo pero la función Hamiltoniana\n")
+                        self.txt_results.insert(tk.END, "  no se pudo determinar analíticamente con los métodos empleados.\n")
+                        
+                except Exception as e:
+                    self.txt_results.insert(tk.END, "  El sistema es conservativo pero la función Hamiltoniana\n")
+                    self.txt_results.insert(tk.END, "  no se pudo determinar analíticamente.\n")
+                    
+            else:
+                self.txt_results.insert(tk.END, "✗ SISTEMA NO CONSERVATIVO (No Hamiltoniano)\n")
+                self.txt_results.insert(tk.END, f"  La divergencia NO es cero: ∇·F = {divergence_simplified}\n")
+                self.txt_results.insert(tk.END, "  El sistema es disipativo (hay pérdida o ganancia de energía).\n")
+                
+                # Check if it's volume-preserving (Liouville)
+                if divergence_simplified.is_constant():
+                    if divergence_simplified < 0:
+                        self.txt_results.insert(tk.END, "  El volumen del espacio de fases se contrae (sistema disipativo).\n")
+                    elif divergence_simplified > 0:
+                        self.txt_results.insert(tk.END, "  El volumen del espacio de fases se expande (sistema inestable).\n")
+            
+            self.txt_results.insert(tk.END, "\n")
+            
+        except Exception as e:
+            self.txt_results.insert(tk.END, f"Error al analizar conservación: {str(e)}\n\n")
             
     def _find_equilibrium_points(self, x_prime_expr, y_prime_expr):
         """Find equilibrium points numerically."""
@@ -618,8 +758,6 @@ class NonlinearSystem2DApp:
         ax1.set_ylabel('y', fontsize=12)
         ax1.set_title('Retrato de Fase del Sistema No Lineal', fontsize=14, fontweight='bold')
         ax1.grid(True, alpha=0.3)
-        ax1.axhline(y=0, color='k', linewidth=0.5)
-        ax1.axvline(x=0, color='k', linewidth=0.5)
         
         # Add canvas
         canvas = FigureCanvasTkAgg(fig, master=self.right_panel)
@@ -676,14 +814,34 @@ class NonlinearSystem2DApp:
                                     try:
                                         dx = f_x(x, y)
                                         dy = f_y(x, y)
-                                        dx = float(dx) if np.isscalar(dx) else float(dx[0]) if hasattr(dx, '__len__') else 0.0
-                                        dy = float(dy) if np.isscalar(dy) else float(dy[0]) if hasattr(dy, '__len__') else 0.0
+                                        
+                                        # Robust type conversion
+                                        if isinstance(dx, np.ndarray):
+                                            dx = float(dx.item()) if dx.size == 1 else float(dx.flat[0])
+                                        elif hasattr(dx, '__float__'):
+                                            try:
+                                                dx = float(dx)
+                                            except (TypeError, ValueError):
+                                                dx = 0.0
+                                        else:
+                                            dx = 0.0
+                                        
+                                        if isinstance(dy, np.ndarray):
+                                            dy = float(dy.item()) if dy.size == 1 else float(dy.flat[0])
+                                        elif hasattr(dy, '__float__'):
+                                            try:
+                                                dy = float(dy)
+                                            except (TypeError, ValueError):
+                                                dy = 0.0
+                                        else:
+                                            dy = 0.0
+                                        
                                         if not np.isfinite(dx):
                                             dx = 0.0
                                         if not np.isfinite(dy):
                                             dy = 0.0
                                         return [dx, dy]
-                                    except:
+                                    except Exception as e:
                                         return [0.0, 0.0]
                                 
                                 sol = odeint(system, [x0, y0], t)
@@ -725,9 +883,27 @@ class NonlinearSystem2DApp:
             try:
                 dx = f_x(x, y)
                 dy = f_y(x, y)
-                # Convert to float and check validity
-                dx = float(dx) if np.isscalar(dx) else float(dx[0]) if hasattr(dx, '__len__') else 0.0
-                dy = float(dy) if np.isscalar(dy) else float(dy[0]) if hasattr(dy, '__len__') else 0.0
+                
+                # Handle different return types from lambdify more robustly
+                if isinstance(dx, np.ndarray):
+                    dx = float(dx.item()) if dx.size == 1 else float(dx.flat[0])
+                elif hasattr(dx, '__float__'):
+                    try:
+                        dx = float(dx)
+                    except (TypeError, ValueError):
+                        dx = 0.0
+                else:
+                    dx = 0.0
+                
+                if isinstance(dy, np.ndarray):
+                    dy = float(dy.item()) if dy.size == 1 else float(dy.flat[0])
+                elif hasattr(dy, '__float__'):
+                    try:
+                        dy = float(dy)
+                    except (TypeError, ValueError):
+                        dy = 0.0
+                else:
+                    dy = 0.0
                 
                 # Check for NaN or infinity
                 if not np.isfinite(dx):
@@ -736,7 +912,7 @@ class NonlinearSystem2DApp:
                     dy = 0.0
                     
                 return [dx, dy]
-            except:
+            except Exception as e:
                 return [0.0, 0.0]
         
         # Forward integration - reduced points
