@@ -56,6 +56,11 @@ class LinearSystem2DApp(tk.Tk):
         # Poincaré map parameter
         self.poincare_dt = tk.DoubleVar(value=0.5)
         
+        # Interactive trajectory options
+        self.trajectory_direction = tk.StringVar(value="forward")  # "forward", "backward", "both"
+        self.clicked_trajectories = []
+        self.click_cid = None
+        
         # Exercise selector
         self.exercise_var = tk.StringVar(value="Manual")
         
@@ -368,6 +373,25 @@ class LinearSystem2DApp(tk.Tk):
 
     def _create_control_buttons(self):
         """Create control buttons."""
+        # Trajectory control section
+        traj_frame = ttk.LabelFrame(self.left_panel, text="Trayectorias Interactivas")
+        traj_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=4)
+        
+        ttk.Label(traj_frame, text="Haz clic en el retrato de fase para graficar trayectorias", 
+                 font=("Arial", 9, "italic"), foreground="blue").pack(anchor="w", padx=8, pady=(4, 2))
+        
+        # Trajectory direction
+        ttk.Label(traj_frame, text="Dirección de integración:").pack(anchor="w", padx=8, pady=(4, 2))
+        dir_frame = ttk.Frame(traj_frame)
+        dir_frame.pack(fill=tk.X, padx=8, pady=2)
+        ttk.Radiobutton(dir_frame, text="Adelante", variable=self.trajectory_direction, value="forward").pack(anchor="w", padx=16)
+        ttk.Radiobutton(dir_frame, text="Atrás", variable=self.trajectory_direction, value="backward").pack(anchor="w", padx=16)
+        ttk.Radiobutton(dir_frame, text="Ambas", variable=self.trajectory_direction, value="both").pack(anchor="w", padx=16)
+        
+        ttk.Button(traj_frame, text="Limpiar Trayectorias Click", 
+                  command=self.clear_clicked_trajectories).pack(fill=tk.X, padx=8, pady=(4, 8))
+        
+        # Main action buttons
         button_frame = ttk.LabelFrame(self.left_panel, text="Acciones")
         button_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=4)
         
@@ -866,6 +890,12 @@ class LinearSystem2DApp(tk.Tk):
         self.ax_phase.axvline(x=0, color='k', linewidth=0.5)
         self.ax_phase.legend()
         
+        # Bind click event for interactive trajectories
+        if self.click_cid:
+            self.canvas_phase.mpl_disconnect(self.click_cid)
+        self.click_cid = self.canvas_phase.mpl_connect('button_press_event', 
+                                                       lambda event: self._on_phase_click(event, A))
+        
         self.canvas_phase.draw()
 
     def _plot_poincare_map(self, A):
@@ -1138,8 +1168,148 @@ class LinearSystem2DApp(tk.Tk):
         
         self.canvas_traj.draw()
 
+    def _on_phase_click(self, event, A):
+        """Handle click event to plot trajectory from clicked point on phase portrait."""
+        # Validate click is in the axes
+        if event.inaxes != self.ax_phase:
+            return
+        
+        # Get coordinates
+        x0, y0 = event.xdata, event.ydata
+        
+        # Validate coordinates
+        if x0 is None or y0 is None:
+            return
+        
+        if not np.isfinite(x0) or not np.isfinite(y0):
+            return
+        
+        # Check if coordinates are within plot bounds
+        x_min, x_max = self.x_min.get(), self.x_max.get()
+        y_min, y_max = self.y_min.get(), self.y_max.get()
+        
+        if not (x_min <= x0 <= x_max and y_min <= y0 <= y_max):
+            return
+        
+        # Store clicked trajectory
+        self.clicked_trajectories.append((x0, y0))
+        
+        try:
+            # Plot trajectory
+            self._plot_single_trajectory(A, x0, y0, color='red', alpha=0.9, linewidth=2)
+            
+            # Redraw canvas
+            self.canvas_phase.draw_idle()
+        except Exception as e:
+            print(f"Error plotting trajectory: {e}")
+            # Remove the failed trajectory from list
+            if self.clicked_trajectories and self.clicked_trajectories[-1] == (x0, y0):
+                self.clicked_trajectories.pop()
+    
+    def _plot_single_trajectory(self, A, x0, y0, color='blue', alpha=0.8, linewidth=1.5):
+        """Plot a single trajectory from initial condition (x0, y0)."""
+        t_max = self.time_max.get()
+        direction = self.trajectory_direction.get()
+        
+        # Check if using forcing functions
+        use_forcing = self.use_forcing.get()
+        
+        if use_forcing:
+            # Use non-homogeneous system
+            try:
+                t_sym = sp.Symbol('t')
+                f1_expr = sp.sympify(self.f1_str.get())
+                f2_expr = sp.sympify(self.f2_str.get())
+                f1_func = sp.lambdify(t_sym, f1_expr, 'numpy')
+                f2_func = sp.lambdify(t_sym, f2_expr, 'numpy')
+                
+                def system_func(state, t):
+                    x, y = state
+                    f1_val = f1_func(t)
+                    f2_val = f2_func(t)
+                    if not np.isfinite(f1_val):
+                        f1_val = 0
+                    if not np.isfinite(f2_val):
+                        f2_val = 0
+                    dx = A[0,0] * x + A[0,1] * y + f1_val
+                    dy = A[1,0] * x + A[1,1] * y + f2_val
+                    return [dx, dy]
+            except:
+                # Fall back to homogeneous
+                def system_func(state, t):
+                    x, y = state
+                    dx = A[0,0] * x + A[0,1] * y
+                    dy = A[1,0] * x + A[1,1] * y
+                    return [dx, dy]
+        else:
+            # Homogeneous system
+            def system_func(state, t):
+                x, y = state
+                dx = A[0,0] * x + A[0,1] * y
+                dy = A[1,0] * x + A[1,1] * y
+                return [dx, dy]
+        
+        # Forward integration
+        if direction in ["forward", "both"]:
+            t_forward = np.linspace(0, t_max, 200)
+            try:
+                from scipy.integrate import odeint
+                sol_forward = odeint(system_func, [x0, y0], t_forward)
+                
+                if len(sol_forward) > 1:
+                    valid_mask = np.isfinite(sol_forward[:, 0]) & np.isfinite(sol_forward[:, 1])
+                    if np.any(valid_mask):
+                        sol_valid = sol_forward[valid_mask]
+                        if len(sol_valid) > 1:
+                            self.ax_phase.plot(sol_valid[:, 0], sol_valid[:, 1], color=color, 
+                                             alpha=alpha, linewidth=linewidth, zorder=3)
+            except:
+                pass
+        
+        # Backward integration
+        if direction in ["backward", "both"]:
+            t_backward = np.linspace(0, -t_max, 200)
+            try:
+                from scipy.integrate import odeint
+                sol_backward = odeint(system_func, [x0, y0], t_backward)
+                
+                if len(sol_backward) > 1:
+                    valid_mask = np.isfinite(sol_backward[:, 0]) & np.isfinite(sol_backward[:, 1])
+                    if np.any(valid_mask):
+                        sol_valid = sol_backward[valid_mask]
+                        if len(sol_valid) > 1:
+                            self.ax_phase.plot(sol_valid[:, 0], sol_valid[:, 1], color=color, 
+                                             alpha=alpha, linewidth=linewidth, linestyle='--', zorder=3)
+            except:
+                pass
+        
+        # Mark initial point
+        try:
+            self.ax_phase.plot(x0, y0, 'o', color=color, markersize=6, 
+                             markeredgecolor='black', markeredgewidth=0.5, zorder=4)
+        except:
+            pass
+    
+    def clear_clicked_trajectories(self):
+        """Clear clicked trajectories and replot."""
+        self.clicked_trajectories = []
+        if self._current_matrix is not None:
+            try:
+                # Replot phase portrait without clicked trajectories
+                self._plot_phase_portrait(self._current_matrix)
+            except Exception as e:
+                print(f"Error reploting: {e}")
+    
     def clear_plots(self):
         """Clear all plots."""
+        self.clicked_trajectories = []
+        if self.click_cid:
+            try:
+                self.canvas_phase.mpl_disconnect(self.click_cid)
+                self.click_cid = None
+            except:
+                pass
+        
         self.ax_phase.clear()
         self.ax_phase.set_title('Retrato de Fase')
         self.ax_phase.set_xlabel('x')
