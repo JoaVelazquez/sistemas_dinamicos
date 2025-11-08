@@ -30,6 +30,11 @@ class LinearSystem2DApp(tk.Tk):
         self.title("Sistemas Dinámicos Lineales 2D - Análisis de Nodos v1.1")
         self.geometry("1400x900")
         
+        # Theme color (matching launcher card)
+        self.theme_color = "#3498db"  # Blue for Linear Systems
+        self.theme_color_light = "#5dade2"
+        self.theme_color_dark = "#2874a6"
+        
         # Variables for the system x' = Ax (matrix form)
         self.a11 = tk.DoubleVar(value=1.0)  # dx/dt = a11*x + a12*y
         self.a12 = tk.DoubleVar(value=0.0)
@@ -107,6 +112,18 @@ class LinearSystem2DApp(tk.Tk):
 
     def _build_ui(self):
         """Build the main UI with left panel for controls and right panel for plots."""
+        # Configure theme styles
+        style = ttk.Style()
+        style.configure('Themed.TButton', 
+                       background=self.theme_color,
+                       foreground='white',
+                       borderwidth=1,
+                       focuscolor='none',
+                       padding=6)
+        style.map('Themed.TButton',
+                 background=[('active', self.theme_color_light)],
+                 foreground=[('active', 'white')])
+        
         # Create main horizontal layout
         main_paned = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)

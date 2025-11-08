@@ -36,6 +36,11 @@ class HopfBifurcationApp:
         self.root.title("Simulador de Bifurcación de Hopf")
         self.root.geometry("1400x900")
         
+        # Theme color (matching launcher card)
+        self.theme_color = "#e67e22"  # Orange for Hopf Bifurcation
+        self.theme_color_light = "#f39c12"
+        self.theme_color_dark = "#d35400"
+        
         # System equations (use 'mu' as parameter name)
         self.x_prime_str = tk.StringVar(value="mu*x - y - x*(x**2 + y**2)")
         self.y_prime_str = tk.StringVar(value="x + mu*y - y*(x**2 + y**2)")
@@ -64,6 +69,18 @@ class HopfBifurcationApp:
         
     def _create_ui(self):
         """Create the main user interface."""
+        # Configure theme styles
+        style = ttk.Style()
+        style.configure('Themed.TButton', 
+                       background=self.theme_color,
+                       foreground='white',
+                       borderwidth=1,
+                       focuscolor='none',
+                       padding=6)
+        style.map('Themed.TButton',
+                 background=[('active', self.theme_color_light)],
+                 foreground=[('active', 'white')])
+        
         # Main container
         main_container = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_container.pack(fill=tk.BOTH, expand=True)
@@ -288,9 +305,11 @@ class HopfBifurcationApp:
         button_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=4)
         
         ttk.Button(button_frame, text="🔬 Analizar Bifurcación", 
-                  command=self.analyze_bifurcation).pack(fill=tk.X, padx=8, pady=4)
+                  command=self.analyze_bifurcation,
+                  style='Themed.TButton').pack(fill=tk.X, padx=8, pady=4)
         ttk.Button(button_frame, text="🧹 Limpiar", 
-                  command=self.clear_plots).pack(fill=tk.X, padx=8, pady=4)
+                  command=self.clear_plots,
+                  style='Themed.TButton').pack(fill=tk.X, padx=8, pady=4)
         
     def _create_results_display(self):
         """Create results display area."""

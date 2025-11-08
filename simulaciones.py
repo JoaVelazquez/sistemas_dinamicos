@@ -23,6 +23,7 @@ from bifurcacion_hopf import HopfBifurcationApp
 from sistemas_lineales_2d import LinearSystem2DApp
 from sistemas_no_lineales_2d import NonlinearSystem2DApp
 from simulador_lanchester import LanchesterSimulator
+from simulador_verhulst import VerhulstSimulator
 
 
 class SimulationLauncher(tk.Tk):
@@ -161,6 +162,14 @@ class SimulationLauncher(tk.Tk):
                 'details': '• Combate: lineal/cuadrático/mixto\n• Especies: competencia/pred-presa\n• Análisis económico\n• Refuerzos y fatiga',
                 'color': '#16a085',
                 'command': self._launch_lanchester
+            },
+            {
+                'title': 'Verhulst / Epidemias',
+                'dimension': 'Crecimiento Logístico',
+                'description': 'Modelo de Verhulst para propagación de infecciones',
+                'details': '• Ecuación: dP/dt = k·P·(N-P)\n• Ajuste de datos observados\n• Predicción de propagación\n• Análisis paso a paso',
+                'color': '#27ae60',
+                'command': self._launch_verhulst
             }
         ]
         
@@ -357,6 +366,18 @@ class SimulationLauncher(tk.Tk):
             root.mainloop()
         except Exception as e:
             self._show_error("Simulador Lanchester", str(e))
+            self.deiconify()
+    
+    def _launch_verhulst(self):
+        """Launch the Verhulst Epidemiology Simulator"""
+        self.iconify()
+        try:
+            root = tk.Toplevel()
+            app = VerhulstSimulator(root)
+            root.protocol("WM_DELETE_WINDOW", lambda: self._on_simulation_close(root))
+            root.mainloop()
+        except Exception as e:
+            self._show_error("Simulador de Verhulst", str(e))
             self.deiconify()
     
     def _on_simulation_close(self, window):

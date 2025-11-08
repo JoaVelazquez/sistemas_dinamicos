@@ -147,6 +147,12 @@ class BifurcationApp(tk.Tk):
         super().__init__()
         self.title("Bifurcaciones - Modelado y Simulación (x' = f(x, r)) - v4.4")
         self.geometry("1400x800")  # Wider to accommodate two panels
+        
+        # Theme color (matching launcher card)
+        self.theme_color = "#e74c3c"  # Red for Bifurcations 1D
+        self.theme_color_light = "#ec7063"
+        self.theme_color_dark = "#c0392b"
+        
         self.x, self.r = sp.symbols('x r')
 
         self.f_str = tk.StringVar(value="r*x - x**3")
@@ -168,6 +174,18 @@ class BifurcationApp(tk.Tk):
         self._build_ui(); self._render_latex()
 
     def _build_ui(self):
+        # Configure theme styles
+        style = ttk.Style()
+        style.configure('Themed.TButton', 
+                       background=self.theme_color,
+                       foreground='white',
+                       borderwidth=1,
+                       focuscolor='none',
+                       padding=6)
+        style.map('Themed.TButton',
+                 background=[('active', self.theme_color_light)],
+                 foreground=[('active', 'white')])
+        
         # Create main horizontal layout with two panels
         main_paned = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
@@ -259,9 +277,8 @@ class BifurcationApp(tk.Tk):
         for i, (text, command) in enumerate(buttons):
             row = i // 2
             col = i % 2
-            ttk.Button(button_frame, text=text, command=command).grid(
-                row=row, column=col, padx=4, pady=2, sticky="we"
-            )
+            btn = ttk.Button(button_frame, text=text, command=command, style='Themed.TButton')
+            btn.grid(row=row, column=col, padx=4, pady=2, sticky="we")
         
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
