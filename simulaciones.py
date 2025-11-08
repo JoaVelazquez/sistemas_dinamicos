@@ -19,6 +19,7 @@ import sys
 
 # Import all simulation modules
 from bifurcaciones_1 import BifurcationApp
+from bifurcacion_hopf import HopfBifurcationApp
 from sistemas_lineales_2d import LinearSystem2DApp
 from sistemas_no_lineales_2d import NonlinearSystem2DApp
 from simulador_lanchester import LanchesterSimulator
@@ -34,7 +35,7 @@ class SimulationLauncher(tk.Tk):
         super().__init__()
         
         self.title("Simulaciones de Sistemas Dinámicos")
-        self.geometry("900x650")
+        self.geometry("900x850")  # Increased height for 3 rows
         self.configure(bg='#f0f0f0')
         
         # Make window appear in center of screen
@@ -130,42 +131,52 @@ class SimulationLauncher(tk.Tk):
                 'command': self._launch_bifurcations
             },
             {
+                'title': 'Bifurcación de Hopf',
+                'dimension': 'Análisis Especializado',
+                'description': 'Simulador dedicado para bifurcaciones de Hopf',
+                'details': '• 3 valores de μ configurables\n• Visualización comparativa\n• Análisis de estabilidad\n• Identificación de ciclo límite',
+                'color': '#e67e22',
+                'command': self._launch_hopf_bifurcation
+            },
+            {
                 'title': 'Sistemas Lineales',
                 'dimension': '2 Dimensiones',
                 'description': 'Análisis de sistemas dinámicos lineales 2D',
-                'details': '• Retratos de fase\n• Clasificación de puntos críticos\n• Mapas de Poincaré\n• Entrada por matriz o ecuaciones',
+                'details': '• Retratos de fase\n• Clasificación de puntos críticos\n• Mapas de Poincaré\n• Trayectorias interactivas (click)',
                 'color': '#3498db',
                 'command': self._launch_linear_systems
             },
             {
                 'title': 'Sistemas No Lineales',
                 'dimension': '2 Dimensiones',
-                'description': 'Análisis de sistemas dinámicos no lineales 2D',
-                'details': '• Puntos de equilibrio\n• Linearización (Jacobiano)\n• Clasificación hiperbólica\n• Sistemas conservativos',
+                'description': 'Análisis de sistemas dinámicos no lineales 2D + Bifurcaciones de Hopf',
+                'details': '• Puntos de equilibrio\n• Linearización (Jacobiano)\n• Análisis de bifurcaciones (Hopf)\n• Trayectorias interactivas (click)',
                 'color': '#9b59b6',
                 'command': self._launch_nonlinear_systems
             },
             {
-                'title': 'Lanchester',
-                'dimension': 'Modelos de Combate',
-                'description': 'Simulación de modelos de guerra de Lanchester',
-                'details': '• Modelos lineal/cuadrático/mixto\n• Análisis económico\n• Refuerzos y fatiga\n• Mercenarios',
+                'title': 'Lanchester / Especies',
+                'dimension': 'Guerra & Ecología',
+                'description': 'Modelos de guerra y dinámicas de especies',
+                'details': '• Combate: lineal/cuadrático/mixto\n• Especies: competencia/pred-presa\n• Análisis económico\n• Refuerzos y fatiga',
                 'color': '#16a085',
                 'command': self._launch_lanchester
             }
         ]
         
-        # Create 2x2 grid
+        # Create 3x2 grid (or adjust based on number of simulations)
+        n_cols = 2
         for i, sim in enumerate(simulations):
-            row = i // 2
-            col = i % 2
+            row = i // n_cols
+            col = i % n_cols
             
             card = self._create_card(parent, sim)
             card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
             
         # Configure grid weights for equal distribution
-        parent.grid_rowconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=1)
+        n_rows = (len(simulations) + n_cols - 1) // n_cols
+        for row in range(n_rows):
+            parent.grid_rowconfigure(row, weight=1)
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_columnconfigure(1, weight=1)
         
@@ -299,6 +310,18 @@ class SimulationLauncher(tk.Tk):
             app.mainloop()
         except Exception as e:
             self._show_error("Bifurcaciones 1D", str(e))
+            self.deiconify()
+    
+    def _launch_hopf_bifurcation(self):
+        """Launch the Hopf Bifurcation Simulator"""
+        self.iconify()
+        try:
+            root = tk.Toplevel()
+            app = HopfBifurcationApp(root)
+            root.protocol("WM_DELETE_WINDOW", lambda: self._on_simulation_close(root))
+            root.mainloop()
+        except Exception as e:
+            self._show_error("Bifurcación de Hopf", str(e))
             self.deiconify()
     
     def _launch_linear_systems(self):
