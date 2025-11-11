@@ -14,7 +14,9 @@ python simulaciones.py
 ```
 
 ### 3. Explorar (1.5 min)
-
+////////////////
+!!!IMPORTANTE!!! : usar pantalla COMPLETA en todas las pantallas para ver todas las opciones.
+////////////////
 ✅ Haz clic en cualquier tarjeta de color
 ✅ Prueba los **ejemplos rápidos** (botones verdes)
 ✅ Modifica valores y observa cambios
