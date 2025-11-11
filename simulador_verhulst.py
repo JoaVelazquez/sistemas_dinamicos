@@ -20,7 +20,7 @@ Características:
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from tkinter.scrolledtext import ScrolledText
 import numpy as np
 import matplotlib
@@ -28,8 +28,10 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from matplotlib.animation import FuncAnimation
 from scipy.integrate import odeint
 from scipy.optimize import curve_fit
+import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -61,6 +63,17 @@ class VerhulstSimulator:
         # Display options
         self.show_solution_steps = tk.BooleanVar(value=True)
         self.show_derivative = tk.BooleanVar(value=True)
+        
+        # Agent simulation parameters
+        self.agent_n = tk.IntVar(value=400)
+        self.agent_init_infected = tk.IntVar(value=10)
+        self.agent_radius = tk.DoubleVar(value=0.03)
+        self.agent_beta = tk.DoubleVar(value=0.25)
+        self.agent_speed = tk.DoubleVar(value=1.0)
+        self.agent_steps = tk.IntVar(value=500)
+        self.agent_use_recovery = tk.BooleanVar(value=True)
+        self.agent_recovery_time = tk.IntVar(value=300)
+        self.agents_state = None  # (pos, vel, state, timer)
         
         # Create UI
         self._create_ui()
@@ -263,6 +276,34 @@ class VerhulstSimulator:
                   font=("Arial", 10, "bold"),
                   cursor='hand2').pack(fill=tk.X, padx=8, pady=4)
         
+        # Advanced features
+        tk.Button(button_frame, text="🎬 Simulación de Agentes", 
+                  command=self.show_agent_simulation,
+                  bg=self.theme_color_dark, fg='white',
+                  activebackground=self.theme_color,
+                  activeforeground='white',
+                  relief=tk.RAISED, bd=2,
+                  font=("Arial", 10, "bold"),
+                  cursor='hand2').pack(fill=tk.X, padx=8, pady=4)
+        
+        tk.Button(button_frame, text="📊 Tabla RK4 Detallada", 
+                  command=self.show_rk4_table,
+                  bg=self.theme_color_dark, fg='white',
+                  activebackground=self.theme_color,
+                  activeforeground='white',
+                  relief=tk.RAISED, bd=2,
+                  font=("Arial", 10, "bold"),
+                  cursor='hand2').pack(fill=tk.X, padx=8, pady=4)
+        
+        tk.Button(button_frame, text="💾 Exportar a CSV", 
+                  command=self.export_to_csv,
+                  bg=self.theme_color_dark, fg='white',
+                  activebackground=self.theme_color,
+                  activeforeground='white',
+                  relief=tk.RAISED, bd=2,
+                  font=("Arial", 10, "bold"),
+                  cursor='hand2').pack(fill=tk.X, padx=8, pady=4)
+        
     def _create_data_display(self):
         """Create data points display."""
         display_frame = ttk.LabelFrame(self.left_panel, text="Datos Ingresados")
@@ -427,6 +468,20 @@ class VerhulstSimulator:
             
             # Solve numerically (for verification)
             P_numerical = self._verhulst_numerical(t, P0, k, N)
+            
+            # Calculate derivative
+            dPdt = k * P_analytical * (N - P_analytical)
+            
+            # Store data for export
+            self.last_simulation_data = {
+                'Tiempo_días': t,
+                'P_Analítico': P_analytical,
+                'P_Numérico': P_numerical,
+                'dP/dt': dPdt,
+                'k': [k] * len(t),
+                'N': [N] * len(t),
+                'P0': [P0] * len(t)
+            }
             
             # Create plots
             self._create_plots(t, P_analytical, P_numerical, k, N, P0)
@@ -757,6 +812,322 @@ class VerhulstSimulator:
             text.insert(tk.END, f"({'Excelente' if r_squared > 0.9 else 'Bueno' if r_squared > 0.7 else 'Moderado'} ajuste)\n\n")
         
         text.config(state='disabled')
+    
+    def show_rk4_table(self):
+        """Show detailed RK4 integration steps."""
+        try:
+            # Get parameters
+            k = self.k_value.get()
+            N = self.N_value.get()
+            P0 = self.P0_value.get()
+            t_max = min(self.t_max.get(), 10)  # Only show first 10 days for clarity
+            dt = 0.1
+            
+            # Create window
+            rk4_window = tk.Toplevel(self.root)
+            rk4_window.title("Tabla Detallada - Método RK4")
+            rk4_window.geometry("900x600")
+            
+            # Create text widget
+            text = ScrolledText(rk4_window, wrap='none', font=("Courier", 9))
+            text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # Header
+            text.insert(tk.END, "═" * 100 + "\n")
+            text.insert(tk.END, "MÉTODO RUNGE-KUTTA DE ORDEN 4 (RK4)\n")
+            text.insert(tk.END, "═" * 100 + "\n\n")
+            
+            text.insert(tk.END, f"Ecuación: dP/dt = k·P·(N - P) = {k}·P·({N} - P)\n")
+            text.insert(tk.END, f"Condición inicial: P(0) = {P0}\n")
+            text.insert(tk.END, f"Paso de integración: dt = {dt}\n\n")
+            
+            text.insert(tk.END, "Fórmula RK4:\n")
+            text.insert(tk.END, "  k₁ = f(tₙ, Pₙ)\n")
+            text.insert(tk.END, "  k₂ = f(tₙ + dt/2, Pₙ + dt·k₁/2)\n")
+            text.insert(tk.END, "  k₃ = f(tₙ + dt/2, Pₙ + dt·k₂/2)\n")
+            text.insert(tk.END, "  k₄ = f(tₙ + dt, Pₙ + dt·k₃)\n")
+            text.insert(tk.END, "  Pₙ₊₁ = Pₙ + (dt/6)·(k₁ + 2k₂ + 2k₃ + k₄)\n\n")
+            
+            text.insert(tk.END, "─" * 100 + "\n")
+            text.insert(tk.END, f"{'n':>3} {'tₙ':>8} {'Pₙ':>12} {'k₁':>12} {'k₂':>12} {'k₃':>12} {'k₄':>12} {'Pₙ₊₁':>12}\n")
+            text.insert(tk.END, "─" * 100 + "\n")
+            
+            # Calculate steps
+            def f(t, P):
+                return k * P * (N - P)
+            
+            t = 0.0
+            P = P0
+            steps = int(t_max / dt)
+            
+            for i in range(min(steps, 100)):  # Limit to 100 steps for display
+                k1 = f(t, P)
+                k2 = f(t + dt/2, P + dt*k1/2)
+                k3 = f(t + dt/2, P + dt*k2/2)
+                k4 = f(t + dt, P + dt*k3)
+                P_next = P + (dt/6) * (k1 + 2*k2 + 2*k3 + k4)
+                
+                text.insert(tk.END, 
+                    f"{i:3d} {t:8.2f} {P:12.6f} {k1:12.6f} {k2:12.6f} {k3:12.6f} {k4:12.6f} {P_next:12.6f}\n")
+                
+                t += dt
+                P = P_next
+            
+            text.insert(tk.END, "─" * 100 + "\n")
+            text.insert(tk.END, f"\nValor final: P({t:.2f}) = {P:.6f}\n")
+            
+            # Compare with analytical
+            P_analytical = self._verhulst_solution(np.array([t]), P0, k, N)[0]
+            error = abs(P - P_analytical)
+            rel_error = error / P_analytical * 100 if P_analytical > 0 else 0
+            
+            text.insert(tk.END, f"Solución analítica: P({t:.2f}) = {P_analytical:.6f}\n")
+            text.insert(tk.END, f"Error absoluto: {error:.6e}\n")
+            text.insert(tk.END, f"Error relativo: {rel_error:.4f}%\n")
+            
+            text.config(state='disabled')
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al generar tabla RK4:\n{str(e)}")
+    
+    def export_to_csv(self):
+        """Export simulation results to CSV."""
+        try:
+            # Check if we have simulation data
+            if not hasattr(self, 'last_simulation_data'):
+                messagebox.showwarning("Advertencia", 
+                    "Primero ejecuta una simulación antes de exportar.")
+                return
+            
+            # Ask for filename
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                title="Guardar resultados como CSV"
+            )
+            
+            if not filename:
+                return
+            
+            # Create DataFrame
+            df = pd.DataFrame(self.last_simulation_data)
+            
+            # Add data points if available
+            if self.data_points:
+                obs_df = pd.DataFrame(self.data_points, columns=['Día_Observado', 'Infectados_Observados'])
+                # Merge on day (approximately)
+                df = df.merge(obs_df, left_on='Tiempo_días', right_on='Día_Observado', how='left')
+            
+            # Save to CSV
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+            
+            messagebox.showinfo("Éxito", 
+                f"Datos exportados exitosamente a:\n{filename}\n\n" +
+                f"Registros: {len(df)}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al exportar CSV:\n{str(e)}")
+    
+    def show_agent_simulation(self):
+        """Show agent-based infection simulation."""
+        agent_window = tk.Toplevel(self.root)
+        agent_window.title("Simulación de Agentes - Mapa de Contagio")
+        agent_window.geometry("1200x800")
+        
+        # Left panel for controls
+        control_frame = ttk.Frame(agent_window, width=300)
+        control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+        
+        # Right panel for visualization
+        viz_frame = ttk.Frame(agent_window)
+        viz_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Controls
+        ttk.Label(control_frame, text="Parámetros de Simulación", 
+                 font=("Arial", 12, "bold")).pack(pady=10)
+        
+        # Number of agents
+        ttk.Label(control_frame, text="Cantidad de agentes:").pack(anchor='w', padx=5)
+        ttk.Entry(control_frame, textvariable=self.agent_n, width=15).pack(padx=5, pady=2)
+        
+        # Initial infected
+        ttk.Label(control_frame, text="Infectados iniciales:").pack(anchor='w', padx=5)
+        ttk.Entry(control_frame, textvariable=self.agent_init_infected, width=15).pack(padx=5, pady=2)
+        
+        # Infection radius
+        ttk.Label(control_frame, text="Radio de contagio:").pack(anchor='w', padx=5)
+        ttk.Scale(control_frame, from_=0.005, to=0.2, 
+                 variable=self.agent_radius, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=5, pady=2)
+        
+        # Infection probability
+        ttk.Label(control_frame, text="Probabilidad de contagio (β):").pack(anchor='w', padx=5)
+        ttk.Scale(control_frame, from_=0.0, to=1.0, 
+                 variable=self.agent_beta, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=5, pady=2)
+        
+        # Movement speed
+        ttk.Label(control_frame, text="Velocidad de movimiento:").pack(anchor='w', padx=5)
+        ttk.Scale(control_frame, from_=0.0, to=3.0, 
+                 variable=self.agent_speed, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=5, pady=2)
+        
+        # Simulation steps
+        ttk.Label(control_frame, text="Pasos de simulación:").pack(anchor='w', padx=5)
+        ttk.Entry(control_frame, textvariable=self.agent_steps, width=15).pack(padx=5, pady=2)
+        
+        # Recovery option
+        ttk.Checkbutton(control_frame, text="Activar recuperación", 
+                       variable=self.agent_use_recovery).pack(anchor='w', padx=5, pady=5)
+        
+        ttk.Label(control_frame, text="Tiempo para recuperarse:").pack(anchor='w', padx=5)
+        ttk.Entry(control_frame, textvariable=self.agent_recovery_time, width=15).pack(padx=5, pady=2)
+        
+        # Status label
+        status_label = ttk.Label(control_frame, text="", font=("Arial", 10))
+        status_label.pack(pady=10)
+        
+        # Buttons
+        btn_frame = ttk.Frame(control_frame)
+        btn_frame.pack(pady=10)
+        
+        def init_agents():
+            n = self.agent_n.get()
+            init_I = self.agent_init_infected.get()
+            
+            # positions in [0,1]^2
+            pos = np.random.rand(n, 2)
+            # velocities random directions
+            angles = np.random.rand(n) * 2 * np.pi
+            vel = np.c_[np.cos(angles), np.sin(angles)]
+            # states: 0=S, 1=I, 2=R
+            state = np.zeros(n, dtype=int)
+            state[:init_I] = 1
+            np.random.shuffle(state)
+            # infection timers
+            timer = np.zeros(n, dtype=int)
+            
+            self.agents_state = (pos, vel, state, timer)
+            status_label.config(text="Agentes inicializados")
+            
+            # Draw initial state
+            draw_agents(pos, state)
+        
+        def step_agents():
+            if self.agents_state is None:
+                messagebox.showwarning("Advertencia", "Primero inicializa los agentes")
+                return
+            
+            pos, vel, state, timer = self.agents_state
+            radius = self.agent_radius.get()
+            beta = self.agent_beta.get()
+            speed = self.agent_speed.get()
+            use_recovery = self.agent_use_recovery.get()
+            recov_time = self.agent_recovery_time.get()
+            
+            n = len(state)
+            # move
+            pos += vel * (speed/100.0)
+            # bounce on borders
+            for d in range(2):
+                over = pos[:, d] > 1
+                under = pos[:, d] < 0
+                vel[over | under, d] *= -1
+                pos[over, d] = 1 - (pos[over, d] - 1)
+                pos[under, d] = -pos[under, d]
+            
+            # infection
+            infected_idx = np.where(state == 1)[0]
+            susceptible_idx = np.where(state == 0)[0]
+            if len(infected_idx) and len(susceptible_idx):
+                inf_pos = pos[infected_idx][:, None, :]
+                sus_pos = pos[susceptible_idx][None, :, :]
+                d2 = np.sum((inf_pos - sus_pos)**2, axis=2)
+                contact = d2 <= radius**2
+                if np.any(contact):
+                    exposed = susceptible_idx[np.any(contact, axis=0)]
+                    rng = np.random.rand(len(exposed))
+                    newly = exposed[rng < beta]
+                    state[newly] = 1
+            
+            # recovery
+            if use_recovery and recov_time > 0:
+                timer[state == 1] += 1
+                recovered = np.where((state == 1) & (timer >= recov_time))[0]
+                state[recovered] = 2
+            
+            self.agents_state = (pos, vel, state, timer)
+            return pos, state
+        
+        def draw_agents(pos, state):
+            fig.clear()
+            ax = fig.add_subplot(111)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_aspect('equal')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            
+            # Draw by state
+            colors = ['lightblue', 'red', 'green']
+            labels = ['Susceptible', 'Infectado', 'Recuperado']
+            for s in range(3):
+                mask = state == s
+                if np.any(mask):
+                    ax.scatter(pos[mask, 0], pos[mask, 1], 
+                             c=colors[s], s=30, alpha=0.7, 
+                             label=labels[s], edgecolors='black', linewidth=0.5)
+            
+            ax.legend(loc='upper right')
+            ax.set_title("Mapa de Contagio - Simulación de Agentes", fontweight='bold')
+            
+            # Update counts
+            S = int(np.sum(state == 0))
+            I = int(np.sum(state == 1))
+            R = int(np.sum(state == 2))
+            status_label.config(text=f"S: {S}  |  I: {I}  |  R: {R}")
+            
+            canvas.draw()
+        
+        def run_simulation():
+            if self.agents_state is None:
+                messagebox.showwarning("Advertencia", "Primero inicializa los agentes")
+                return
+            
+            steps = self.agent_steps.get()
+            
+            for i in range(steps):
+                pos, state = step_agents()
+                if i % 5 == 0:  # Update display every 5 steps
+                    draw_agents(pos, state)
+                    agent_window.update()
+                
+                # Stop if no more infected
+                if np.sum(state == 1) == 0:
+                    messagebox.showinfo("Simulación completa", 
+                        f"La epidemia terminó en el paso {i+1}")
+                    break
+        
+        tk.Button(btn_frame, text="🔄 Inicializar", 
+                 command=init_agents,
+                 bg=self.theme_color, fg='white',
+                 font=("Arial", 10, "bold"),
+                 cursor='hand2', width=15).pack(pady=5)
+        
+        tk.Button(btn_frame, text="▶️ Simular", 
+                 command=run_simulation,
+                 bg=self.theme_color_light, fg='white',
+                 font=("Arial", 10, "bold"),
+                 cursor='hand2', width=15).pack(pady=5)
+        
+        # Visualization setup
+        fig = Figure(figsize=(8, 8))
+        canvas = FigureCanvasTkAgg(fig, viz_frame)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Initialize with empty plot
+        ax = fig.add_subplot(111)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_title("Inicializa los agentes para comenzar", fontweight='bold')
+        canvas.draw()
         
     def clear_all(self):
         """Clear all data and plots."""

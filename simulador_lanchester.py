@@ -252,9 +252,96 @@ class LanchesterSimulator:
         
         ttk.Label(frame, text="Paso de tiempo (dt):").grid(row=1, column=0, sticky="w", padx=4, pady=2)
         ttk.Entry(frame, textvariable=self.dt, width=12).grid(row=1, column=1, padx=4, pady=2)
+    
+    def _create_quick_examples(self):
+        """Create quick example buttons."""
+        examples_frame = ttk.LabelFrame(self.scrollable_left, text="📚 Ejemplos Rápidos")
+        examples_frame.pack(fill=tk.X, padx=8, pady=4)
+        
+        ttk.Label(examples_frame, text="Conflictos Bélicos:", 
+                 font=("Arial", 9, "bold")).pack(anchor="w", padx=4, pady=2)
+        
+        # Row 1: Warfare examples
+        row1_frame = ttk.Frame(examples_frame)
+        row1_frame.pack(fill=tk.X, padx=4, pady=2)
+        
+        tk.Button(row1_frame, text="Batalla Equilibrada", 
+                  command=lambda: self._load_warfare_example(100, 100, 0.01, 0.01),
+                  bg="#16a085", fg='white',
+                  activebackground="#1abc9c",
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row1_frame, text="Superioridad Blue", 
+                  command=lambda: self._load_warfare_example(150, 80, 0.015, 0.008),
+                  bg="#16a085", fg='white',
+                  activebackground="#1abc9c",
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        ttk.Label(examples_frame, text="Interacciones Ecológicas:", 
+                 font=("Arial", 9, "bold")).pack(anchor="w", padx=4, pady=(8, 2))
+        
+        # Row 2: Species examples
+        row2_frame = ttk.Frame(examples_frame)
+        row2_frame.pack(fill=tk.X, padx=4, pady=2)
+        
+        tk.Button(row2_frame, text="Competencia", 
+                  command=lambda: self._load_species_example(50, 60, 0.01, 0.01, 0.0002, 0.0002, 200, 200),
+                  bg="#16a085", fg='white',
+                  activebackground="#1abc9c",
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row2_frame, text="Predador-Presa", 
+                  command=lambda: self._load_species_example(40, 15, 0.8, -0.3, -0.02, 0.015, 100, 100),
+                  bg="#16a085", fg='white',
+                  activebackground="#1abc9c",
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row2_frame, text="Mutualismo", 
+                  command=lambda: self._load_species_example(30, 30, 0.005, 0.005, 0.0001, 0.0001, 200, 200),
+                  bg="#16a085", fg='white',
+                  activebackground="#1abc9c",
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+    
+    def _load_warfare_example(self, B0, R0, alpha, beta):
+        """Load a warfare example."""
+        self.mode.set("warfare")
+        self._toggle_mode()
+        self.blue_initial.set(B0)
+        self.red_initial.set(R0)
+        self.alpha.set(alpha)
+        self.beta.set(beta)
+        self.use_reinforcements.set(False)
+        self.use_economics.set(False)
+        self.use_mercenaries.set(False)
+    
+    def _load_species_example(self, S1_0, S2_0, r1, r2, a12, a21, K1, K2):
+        """Load a species interaction example."""
+        self.mode.set("species")
+        self._toggle_mode()
+        self.species1_initial.set(S1_0)
+        self.species2_initial.set(S2_0)
+        self.growth_rate1.set(r1)
+        self.growth_rate2.set(r2)
+        self.interaction_12.set(a12)
+        self.interaction_21.set(a21)
+        self.carrying_capacity1.set(K1)
+        self.carrying_capacity2.set(K2)
         
     def _create_control_buttons(self):
         """Create control buttons."""
+        # Quick examples
+        self._create_quick_examples()
+        
         frame = ttk.LabelFrame(self.scrollable_left, text="Acciones")
         frame.pack(fill=tk.X, padx=8, pady=4)
         

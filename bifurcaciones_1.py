@@ -231,6 +231,9 @@ class BifurcationApp(tk.Tk):
         # Parameter inputs in a more compact layout
         self._create_parameter_inputs_compact(input_frame)
         
+        # Quick examples
+        self._create_quick_examples(input_frame)
+        
         # Control buttons
         self._create_control_buttons_vertical(input_frame)
 
@@ -262,10 +265,81 @@ class BifurcationApp(tk.Tk):
         ttk.Label(parent, text="r para fases:").grid(row=3, column=0, sticky="w", padx=(8, 4), pady=2)
         ttk.Entry(parent, textvariable=self.phase_r_values, width=40).grid(row=3, column=1, columnspan=2, sticky="we", padx=(0, 8), pady=2)
 
+    def _create_quick_examples(self, parent):
+        """Create quick example buttons."""
+        examples_frame = ttk.LabelFrame(parent, text="📚 Ejemplos Rápidos")
+        examples_frame.grid(row=4, column=0, columnspan=3, sticky="we", padx=8, pady=4)
+        
+        # Row 1: Classic bifurcations
+        row1_frame = ttk.Frame(examples_frame)
+        row1_frame.pack(fill=tk.X, padx=4, pady=2)
+        
+        tk.Button(row1_frame, text="Nodo Tangente\nr² - x²", 
+                  command=lambda: self._load_example_bifurcation("r**2 - x**2", -2, 2, -3, 3, "-1, 0, 1"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row1_frame, text="Transcrítica\nrx - x²", 
+                  command=lambda: self._load_example_bifurcation("r*x - x**2", -2, 2, -3, 3, "-1, 0, 1"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row1_frame, text="Horca\nr + x - ln(1+x)", 
+                  command=lambda: self._load_example_bifurcation("r + x - log(1+x)", -1, 2, 0.1, 3, "-0.5, 0, 0.5, 1"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        # Row 2: More bifurcations
+        row2_frame = ttk.Frame(examples_frame)
+        row2_frame.pack(fill=tk.X, padx=4, pady=2)
+        
+        tk.Button(row2_frame, text="Supercrítica\nr - x³", 
+                  command=lambda: self._load_example_bifurcation("r - x**3", -2, 2, -2, 2, "-1, 0, 1"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row2_frame, text="Subcrítica\nr + x³", 
+                  command=lambda: self._load_example_bifurcation("r + x**3", -2, 2, -2, 2, "-1, 0, 1"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        
+        tk.Button(row2_frame, text="Logística\nrx(1-x)", 
+                  command=lambda: self._load_example_bifurcation("r*x*(1-x)", 0, 4, 0, 1, "0.5, 1, 2, 3"),
+                  bg=self.theme_color, fg='white',
+                  activebackground=self.theme_color_light,
+                  font=("Arial", 8, "bold"),
+                  relief=tk.RAISED, bd=2, cursor='hand2',
+                  width=12, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+    
+    def _load_example_bifurcation(self, func_str, r_min, r_max, x_min, x_max, phase_values):
+        """Load a bifurcation example."""
+        self.func_entry.delete(0, tk.END)
+        self.func_entry.insert(0, func_str)
+        self.r_min.set(r_min)
+        self.r_max.set(r_max)
+        self.x_min.set(x_min)
+        self.x_max.set(x_max)
+        self.phase_r_values.set(phase_values)
+
     def _create_control_buttons_vertical(self, parent):
         """Create control buttons in a vertical layout."""
         button_frame = ttk.LabelFrame(parent, text="Acciones")
-        button_frame.grid(row=4, column=0, columnspan=3, sticky="we", padx=8, pady=4)
+        button_frame.grid(row=5, column=0, columnspan=3, sticky="we", padx=8, pady=4)
         
         buttons = [
             ("Calcular y Graficar", self.compute_and_plot),
