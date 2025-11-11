@@ -258,7 +258,7 @@ class LanchesterSimulator:
         examples_frame = ttk.LabelFrame(self.scrollable_left, text="📚 Ejemplos Rápidos")
         examples_frame.pack(fill=tk.X, padx=8, pady=4)
         
-        ttk.Label(examples_frame, text="Conflictos Bélicos:", 
+        ttk.Label(examples_frame, text="Escenarios de Combate:", 
                  font=("Arial", 9, "bold")).pack(anchor="w", padx=4, pady=2)
         
         # Row 1: Warfare examples
@@ -266,7 +266,7 @@ class LanchesterSimulator:
         row1_frame.pack(fill=tk.X, padx=4, pady=2)
         
         tk.Button(row1_frame, text="Batalla Equilibrada", 
-                  command=lambda: self._load_warfare_example(100, 100, 0.01, 0.01),
+                  command=lambda: self._load_example1(),
                   bg="#16a085", fg='white',
                   activebackground="#1abc9c",
                   font=("Arial", 8, "bold"),
@@ -274,68 +274,60 @@ class LanchesterSimulator:
                   width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
         tk.Button(row1_frame, text="Superioridad Blue", 
-                  command=lambda: self._load_warfare_example(150, 80, 0.015, 0.008),
+                  command=lambda: self._load_example2(),
                   bg="#16a085", fg='white',
                   activebackground="#1abc9c",
                   font=("Arial", 8, "bold"),
                   relief=tk.RAISED, bd=2, cursor='hand2',
                   width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
-        ttk.Label(examples_frame, text="Interacciones Ecológicas:", 
-                 font=("Arial", 9, "bold")).pack(anchor="w", padx=4, pady=(8, 2))
-        
-        # Row 2: Species examples
-        row2_frame = ttk.Frame(examples_frame)
-        row2_frame.pack(fill=tk.X, padx=4, pady=2)
-        
-        tk.Button(row2_frame, text="Competencia", 
-                  command=lambda: self._load_species_example(50, 60, 0.01, 0.01, 0.0002, 0.0002, 200, 200),
-                  bg="#16a085", fg='white',
-                  activebackground="#1abc9c",
-                  font=("Arial", 8, "bold"),
-                  relief=tk.RAISED, bd=2, cursor='hand2',
-                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
-        
-        tk.Button(row2_frame, text="Predador-Presa", 
-                  command=lambda: self._load_species_example(40, 15, 0.8, -0.3, -0.02, 0.015, 100, 100),
-                  bg="#16a085", fg='white',
-                  activebackground="#1abc9c",
-                  font=("Arial", 8, "bold"),
-                  relief=tk.RAISED, bd=2, cursor='hand2',
-                  width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
-        
-        tk.Button(row2_frame, text="Mutualismo", 
-                  command=lambda: self._load_species_example(30, 30, 0.005, 0.005, 0.0001, 0.0001, 200, 200),
+        tk.Button(row1_frame, text="Con Refuerzos", 
+                  command=lambda: self._load_example3(),
                   bg="#16a085", fg='white',
                   activebackground="#1abc9c",
                   font=("Arial", 8, "bold"),
                   relief=tk.RAISED, bd=2, cursor='hand2',
                   width=15, height=2).pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
     
-    def _load_warfare_example(self, B0, R0, alpha, beta):
-        """Load a warfare example."""
-        self.mode.set("warfare")
-        self._toggle_mode()
-        self.blue_initial.set(B0)
-        self.red_initial.set(R0)
-        self.alpha.set(alpha)
-        self.beta.set(beta)
+    def _load_example1(self):
+        """Batalla equilibrada - fuerzas y efectividad similares."""
+        self.blue_initial.set(100)
+        self.red_initial.set(100)
+        self.alpha.set(0.01)  # Red efectividad contra Blue
+        self.beta.set(0.01)   # Blue efectividad contra Red
+        self.model_type.set("cuadratico")
+        self.use_fatigue.set(False)
         self.use_reinforcements.set(False)
         self.use_economics.set(False)
-        self.use_mercenaries.set(False)
+        self.t_final.set(150)
+        
+    def _load_example2(self):
+        """Superioridad Blue - más efectivo y más tropas."""
+        self.blue_initial.set(120)
+        self.red_initial.set(80)
+        self.alpha.set(0.008)  # Red menos efectivo
+        self.beta.set(0.015)   # Blue más efectivo
+        self.model_type.set("cuadratico")
+        self.use_fatigue.set(False)
+        self.use_reinforcements.set(False)
+        self.use_economics.set(False)
+        self.t_final.set(100)
     
-    def _load_species_example(self, S1_0, S2_0, r1, r2, a12, a21, K1, K2):
-        """Load a species interaction example."""
-        self.mode.set("species")
-        self._toggle_mode()
-        self.species1_initial.set(S1_0)
-        self.species2_initial.set(S2_0)
-        self.growth_rate1.set(r1)
-        self.growth_rate2.set(r2)
-        self.interaction_12.set(a12)
-        self.interaction_21.set(a21)
-        self.carrying_capacity1.set(K1)
-        self.carrying_capacity2.set(K2)
+    def _load_example3(self):
+        """Con refuerzos - Blue recibe apoyo constante."""
+        self.blue_initial.set(80)
+        self.red_initial.set(100)
+        self.alpha.set(0.01)
+        self.beta.set(0.01)
+        self.model_type.set("cuadratico")
+        self.use_fatigue.set(False)
+        self.use_reinforcements.set(True)
+        self.reinf_blue_rate.set(2.0)  # Blue recibe 2 tropas/unidad tiempo
+        self.reinf_blue_start.set(20.0)
+        self.reinf_red_rate.set(0.0)
+        self.reinf_red_start.set(999.0)
+        self.use_economics.set(False)
+        self.t_final.set(150)
         
     def _create_control_buttons(self):
         """Create control buttons."""
@@ -417,11 +409,13 @@ class LanchesterSimulator:
             dB_combat = -alpha * R
             dR_combat = -beta * B
         elif model == "cuadratico":
-            dB_combat = -alpha * R * max(R, 0)
-            dR_combat = -beta * B * max(B, 0)
-        elif model == "mixto":
-            dB_combat = -alpha * R * max(R, 0)
+            # Lanchester cuadrático: dB/dt = -α*R, dR/dt = -β*B (fuego concentrado)
+            dB_combat = -alpha * R
             dR_combat = -beta * B
+        elif model == "mixto":
+            # Mixto: uno cuadrático, otro lineal
+            dB_combat = -alpha * R
+            dR_combat = -beta * B * R
         
         # Fatigue
         if self.use_fatigue.get():

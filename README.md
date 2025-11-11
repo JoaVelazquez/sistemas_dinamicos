@@ -107,7 +107,7 @@ python -c "import numpy, matplotlib, scipy, sympy, tkinter; print('✅ Todas las
 
 ## 🎮 Uso Rápido
 
-### Lanzar la Suite Completa
+### Lanzar la Suite Completa (Recomendado)
 
 ```bash
 python simulaciones.py
@@ -115,27 +115,7 @@ python simulaciones.py
 
 Esto abrirá el **launcher principal** con acceso a todos los simuladores.
 
-### Ejecutar Simuladores Individuales
-
-```bash
-# Bifurcaciones 1D
-python bifurcaciones_1.py
-
-# Bifurcaciones de Hopf
-python bifurcacion_hopf.py
-
-# Sistemas Lineales 2D
-python sistemas_lineales_2d.py
-
-# Sistemas No Lineales 2D
-python sistemas_no_lineales_2d.py
-
-# Simulador de Lanchester
-python simulador_lanchester.py
-
-# Simulador de Verhulst (Epidemias)
-python simulador_verhulst.py
-```
+**💡 Importante:** Todos los simuladores están integrados en el launcher. No necesitas ejecutar módulos individuales.
 
 ---
 
@@ -441,16 +421,23 @@ pip install numpy matplotlib scipy sympy --upgrade
 
 ```
 segunda_parte/
-├── simulaciones.py              # 🚀 Launcher principal
-├── bifurcaciones_1.py           # 🔴 Bifurcaciones 1D
-├── bifurcacion_hopf.py          # 🟠 Bifurcaciones Hopf
-├── sistemas_lineales_2d.py      # 🔵 Sistemas Lineales
-├── sistemas_no_lineales_2d.py   # 🟣 Sistemas No Lineales
-├── simulador_lanchester.py      # 🟢 Lanchester
-├── simulador_verhulst.py        # 🟢 Verhulst/Epidemias
+├── simulaciones.py              # 🚀 LAUNCHER PRINCIPAL - EJECUTA ESTE
+├── modulos/                     # 📁 Carpeta de simuladores
+│   ├── __init__.py
+│   ├── bifurcaciones_1.py           # 🔴 Bifurcaciones 1D
+│   ├── bifurcacion_hopf.py          # 🟠 Bifurcaciones Hopf
+│   ├── sistemas_lineales_2d.py      # 🔵 Sistemas Lineales
+│   ├── sistemas_no_lineales_2d.py   # 🟣 Sistemas No Lineales
+│   ├── simulador_lanchester.py      # 🟢 Lanchester
+│   └── simulador_verhulst.py        # 🟢 Verhulst/Epidemias
 ├── GUIA_VERHULST.md            # 📖 Guía detallada Verhulst
-└── README.md                    # 📄 Este archivo
+├── QUICKSTART.md               # ⚡ Inicio rápido
+├── README.md                    # 📄 Este archivo
+├── requirements.txt             # 📦 Dependencias
+└── LICENSE                      # 📄 Licencia MIT
 ```
+
+**💡 Nota:** Solo ejecuta `simulaciones.py`, no los módulos individuales.
 
 ---
 

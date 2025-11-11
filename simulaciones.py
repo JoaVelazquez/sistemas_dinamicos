@@ -17,13 +17,13 @@ import tkinter as tk
 from tkinter import ttk, font as tkfont
 import sys
 
-# Import all simulation modules
-from bifurcaciones_1 import BifurcationApp
-from bifurcacion_hopf import HopfBifurcationApp
-from sistemas_lineales_2d import LinearSystem2DApp
-from sistemas_no_lineales_2d import NonlinearSystem2DApp
-from simulador_lanchester import LanchesterSimulator
-from simulador_verhulst import VerhulstSimulator
+# Import all simulation modules from modulos package
+from modulos.bifurcaciones_1 import BifurcationApp
+from modulos.bifurcacion_hopf import HopfBifurcationApp
+from modulos.sistemas_lineales_2d import LinearSystem2DApp
+from modulos.sistemas_no_lineales_2d import NonlinearSystem2DApp
+from modulos.simulador_lanchester import LanchesterSimulator
+from modulos.simulador_verhulst import VerhulstSimulator
 
 
 class SimulationLauncher(tk.Tk):
@@ -202,16 +202,46 @@ class SimulationLauncher(tk.Tk):
         content = tk.Frame(card_frame, bg=self.colors['card'])
         content.pack(fill=tk.BOTH, expand=True, padx=20, pady=15)
         
-        # Title
+        # Title and button row
+        title_button_frame = tk.Frame(content, bg=self.colors['card'])
+        title_button_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Title (left side)
         title_font = tkfont.Font(family="Segoe UI", size=16, weight="bold")
         title = tk.Label(
-            content,
+            title_button_frame,
             text=config['title'],
             font=title_font,
             fg=self.colors['primary'],
             bg=self.colors['card']
         )
-        title.pack(anchor='w')
+        title.pack(side=tk.LEFT, anchor='w')
+        
+        # Launch button (right side)
+        button_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
+        launch_btn = tk.Button(
+            title_button_frame,
+            text="Abrir",
+            command=config['command'],
+            bg=config['color'],
+            fg='white',
+            font=button_font,
+            relief='flat',
+            cursor='hand2',
+            padx=12,
+            pady=5
+        )
+        launch_btn.pack(side=tk.RIGHT, anchor='e')
+        
+        # Hover effects for button
+        def on_enter(e):
+            launch_btn.config(bg=self._darken_color(config['color']))
+            
+        def on_leave(e):
+            launch_btn.config(bg=config['color'])
+            
+        launch_btn.bind('<Enter>', on_enter)
+        launch_btn.bind('<Leave>', on_leave)
         
         # Dimension badge
         badge_frame = tk.Frame(content, bg=config['color'], bd=0)
@@ -253,34 +283,6 @@ class SimulationLauncher(tk.Tk):
             justify='left'
         )
         details.pack(anchor='w', pady=(0, 15))
-        
-        # Launch button
-        button_frame = tk.Frame(content, bg=self.colors['card'])
-        button_frame.pack(fill=tk.X)
-        
-        launch_btn = tk.Button(
-            button_frame,
-            text="Abrir Simulación",
-            command=config['command'],
-            bg=config['color'],
-            fg='white',
-            font=tkfont.Font(family="Segoe UI", size=10, weight="bold"),
-            relief='flat',
-            cursor='hand2',
-            padx=15,
-            pady=8
-        )
-        launch_btn.pack(fill=tk.X)
-        
-        # Hover effects
-        def on_enter(e):
-            launch_btn.config(bg=self._darken_color(config['color']))
-            
-        def on_leave(e):
-            launch_btn.config(bg=config['color'])
-            
-        launch_btn.bind('<Enter>', on_enter)
-        launch_btn.bind('<Leave>', on_leave)
         
         return card_frame
     
