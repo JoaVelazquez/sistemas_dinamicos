@@ -24,7 +24,7 @@ def calculate_k_from_two_points(t1, P1, t2, P2, N, P0):
     
     Returns:
     - k: Propagation constant
-    """
+    """ 
     # CORRECTED formula
     ratio1 = (N - P1) / P1
     ratio2 = (N - P2) / P2
